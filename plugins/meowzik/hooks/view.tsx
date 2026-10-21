@@ -3,6 +3,7 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 import type { Phase, Setup, Tab, Track } from '../types'
 import type { Session } from './config'
 import { pictureSvgOf } from './cover'
+import { ICONS } from './icons'
 import {
   barOf,
   COVER_COLUMNS,
@@ -12,8 +13,11 @@ import {
   PAGE_SIZE,
   PANE_ROWS,
   SEEK_BUTTON_SECONDS,
+  SEEK_ROWS,
   SIDE_GAP,
   TEXT_BAR_COLUMNS,
+  VOLUME_COLUMNS,
+  VOLUME_MAX,
   VOLUME_STEP,
 } from './layout'
 import { PALETTE } from './palette'
@@ -36,16 +40,17 @@ import {
   toggleShuffle,
 } from './playback'
 import { isFavorite, pageOf } from './queue'
-import type { SeekbarProps } from './seekbar'
 import { checkTools, installMissing, missingOf, toolLabelOf, TOOLS } from './setup'
 import type { ListName } from './shelf'
+import type { SliderProps } from './slider'
 import { set, snapshot } from './state'
 import type { Values } from './state'
-import { clockOf, lengthOf, LOOP_NAMES, modesOf, noticeTextOf, say, titleOf } from './text'
+import { clockOf, lengthOf, noticeTextOf, say, titleOf } from './text'
 import type { TextKey } from './text'
 
 export const PANE = 'meowzik'
 export const SEEKBAR = 'seekbar'
+export const VOLUME = 'volume'
 
 type Pane = RenderInput<'Pane'>
 
@@ -134,7 +139,7 @@ function heading($: EngineInterface, e: Pane, view: Values) {
           {say('paneTitle')}
         </Text>
         <Text>{say(lead)}</Text>
-        {view.phase === 'idle' && <Text dimColor>{say(hint)}</Text>}
+        {view.phase === 'idle' && <Text dimColor>{say(hint, { play: ICONS.play })}</Text>}
       </Box>
     )
   }
@@ -154,26 +159,27 @@ function heading($: EngineInterface, e: Pane, view: Values) {
   )
 }
 
+const isLive = (view: Values) => view.phase === 'playing' || view.phase === 'paused'
+
 function progress($: EngineInterface, e: Pane, view: Values) {
   const { Box, Button, Text } = $.ui.resolve(e)
-  const times = say('progress', { position: clockOf(view.position), length: lengthOf(view.length) })
 
   if (e.surface === 'terminal' || e.surface === 'desktop') {
     const { Client } = $.ui.resolve(e)
-    const props: SeekbarProps = { position: view.position, length: view.length }
+    const props: SliderProps = {
+      mode: 'seek',
+      fraction: view.length > 0 ? view.position / view.length : 0,
+      total: view.length,
+      label: '',
+      endLabel: lengthOf(view.length),
+      isEnabled: isLive(view) && view.length > 0,
+    }
 
-    return (
-      <Box flexDirection="column">
-        <Client key={SEEKBAR} module="./seekbar.tsx" props={props} width={e.props.bodyColumns} height={1} />
-        <Text tabular dimColor>
-          {times}
-        </Text>
-      </Box>
-    )
+    return <Client key={SEEKBAR} module="./slider.tsx" props={props} width={e.props.bodyColumns} height={SEEK_ROWS} />
   }
 
   const bar = barOf(TEXT_BAR_COLUMNS, view.position, view.length)
-  const isLive = view.phase === 'playing' || view.phase === 'paused'
+  const times = say('progress', { position: clockOf(view.position), length: lengthOf(view.length) })
 
   return (
     <Box flexWrap="wrap" columnGap={GAP} alignItems="center">
@@ -184,35 +190,62 @@ function progress($: EngineInterface, e: Pane, view: Values) {
       <Text tabular dimColor>
         {times}
       </Text>
-      {isLive && <Button key="rewind" dimColor label={say('rewind')} onPress={() => void seekBy($, -SEEK_BUTTON_SECONDS)} />}
-      {isLive && <Button key="forward" dimColor label={say('forward')} onPress={() => void seekBy($, SEEK_BUTTON_SECONDS)} />}
+      {isLive(view) && <Button key="rewind" dimColor label={say('rewind')} onPress={() => void seekBy($, -SEEK_BUTTON_SECONDS)} />}
+      {isLive(view) && <Button key="forward" dimColor label={say('forward')} onPress={() => void seekBy($, SEEK_BUTTON_SECONDS)} />}
     </Box>
   )
 }
 
 function controls($: EngineInterface, e: Pane, view: Values) {
   const { Box, Button } = $.ui.resolve(e)
-  const pauseLabel: TextKey = view.phase === 'paused' ? 'resume' : view.phase === 'idle' ? 'play' : 'pause'
   const isLiked = view.current !== null && isFavorite(view.favorites, view.current.id)
+  const isSounding = view.phase === 'playing' || view.phase === 'loading'
+  const toggle = (key: string, hotkey: string, icon: string, isOn: boolean, onPress: () => void) => (
+    <Button key={key} hotkey={hotkey} variant={variantOf(isOn)} dimColor={!isOn} label={icon} onPress={onPress} />
+  )
 
   return (
-    <Box flexWrap="wrap" columnGap={GAP} rowGap={GAP}>
-      <Button key="back" hotkey="b" label={say('back')} onPress={() => void back($)} />
-      <Button key="pause" hotkey="p" variant="primary" label={say(pauseLabel)} onPress={() => void togglePause($)} />
-      <Button key="skip" hotkey="n" label={say('skip')} onPress={() => void skip($)} />
-      <Button key="stop" hotkey="x" label={say('stop')} onPress={() => void stop($)} />
-      <Button
-        key="loop"
-        hotkey="l"
-        variant={variantOf(view.loop !== 'off')}
-        label={say('loopButton', { mode: say(LOOP_NAMES[view.loop]) })}
-        onPress={() => void cycleLoop($)}
-      />
-      <Button key="shuffle" hotkey="s" variant={variantOf(view.isShuffled)} label={say('shuffle')} onPress={() => void toggleShuffle($)} />
-      <Button key="autoplay" hotkey="a" variant={variantOf(view.isAutoplay)} label={say('autoplay')} onPress={() => void toggleAutoplay($)} />
-      <Button key="favorite" hotkey="f" variant={variantOf(isLiked)} label={say('favorite')} onPress={() => void toggleFavorite($)} />
-      <Button key="volumeDown" hotkey="j" dimColor label={say('volumeDown')} onPress={() => void changeVolume($, -VOLUME_STEP)} />
-      <Button key="volumeUp" hotkey="k" dimColor label={say('volumeUp')} onPress={() => void changeVolume($, VOLUME_STEP)} />
+    <Box flexWrap="wrap" columnGap={SIDE_GAP} rowGap={GAP} alignItems="center">
+      <Box columnGap={GAP}>
+        <Button key="back" hotkey="b" label={ICONS.back} onPress={() => void back($)} />
+        <Button key="pause" hotkey="p" variant="primary" label={isSounding ? ICONS.pause : ICONS.play} onPress={() => void togglePause($)} />
+        <Button key="skip" hotkey="n" label={ICONS.next} onPress={() => void skip($)} />
+        <Button key="stop" hotkey="x" label={ICONS.stop} onPress={() => void stop($)} />
+      </Box>
+      <Box columnGap={GAP}>
+        {toggle('shuffle', 's', ICONS.shuffle, view.isShuffled, () => void toggleShuffle($))}
+        {toggle('loop', 'l', view.loop === 'track' ? ICONS.loopTrack : ICONS.loop, view.loop !== 'off', () => void cycleLoop($))}
+        {toggle('autoplay', 'a', ICONS.autoplay, view.isAutoplay, () => void toggleAutoplay($))}
+        {toggle('favorite', 'f', isLiked ? ICONS.favorited : ICONS.favorite, isLiked, () => void toggleFavorite($))}
+      </Box>
+    </Box>
+  )
+}
+
+function volumeControl($: EngineInterface, e: Pane, view: Values) {
+  const { Box, Button, Text } = $.ui.resolve(e)
+
+  if (e.surface === 'terminal' || e.surface === 'desktop') {
+    const { Client } = $.ui.resolve(e)
+    const props: SliderProps = {
+      mode: 'volume',
+      fraction: view.volume / VOLUME_MAX,
+      total: VOLUME_MAX,
+      label: say('volumeShort'),
+      endLabel: '',
+      isEnabled: true,
+    }
+
+    return <Client key={VOLUME} module="./slider.tsx" props={props} width={Math.min(VOLUME_COLUMNS, e.props.bodyColumns)} height={1} />
+  }
+
+  return (
+    <Box columnGap={GAP} alignItems="center">
+      <Button key="volumeDown" hotkey="j" dimColor label={ICONS.quieter} onPress={() => void changeVolume($, -VOLUME_STEP)} />
+      <Text tabular dimColor>
+        {say('volumeIs', { volume: view.volume })}
+      </Text>
+      <Button key="volumeUp" hotkey="k" dimColor label={ICONS.louder} onPress={() => void changeVolume($, VOLUME_STEP)} />
     </Box>
   )
 }
@@ -296,7 +329,7 @@ function listView($: EngineInterface, e: Pane, view: Values, list: ListName) {
   const storedIndexOf = (shown: number) => (list === 'queue' ? shown : stored.length - 1 - shown)
 
   if (items.length === 0) {
-    return <Text dimColor>{say(EMPTY[list])}</Text>
+    return <Text dimColor>{say(EMPTY[list], { favorite: ICONS.favorite })}</Text>
   }
 
   const { page, pages, rows } = pageOf(items, view.page, PAGE_SIZE)
@@ -404,9 +437,9 @@ export async function drawPane($: EngineInterface, e: Pane, session: Session | n
         {heading($, e, view)}
       </Box>
       {view.current && progress($, e, view)}
-      <Text dimColor>{modesOf(view)}</Text>
-      {next && <Text dimColor>{next}</Text>}
       {controls($, e, view)}
+      {volumeControl($, e, view)}
+      {next && <Text dimColor>{next}</Text>}
       {addField($, e, view)}
       {view.notice && <Text {...toneOf(view.notice.isError)}>{noticeTextOf(view.notice)}</Text>}
       {tabs($, e, view)}

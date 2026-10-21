@@ -8,9 +8,13 @@ export const PAGE_SIZE = 50
 export const GAP = 1
 export const SIDE_GAP = 2
 export const TEXT_BAR_COLUMNS = 30
+export const SEEK_ROWS = 2
+export const VOLUME_COLUMNS = 30
+export const SLIDER_VALUE_COLUMNS = 5
 export const SEEK_KEY_SECONDS = 5
 export const SEEK_BUTTON_SECONDS = 10
 export const VOLUME_STEP = 10
+export const VOLUME_KEY_STEP = 5
 export const VOLUME_MAX = 100
 
 const BAR_DONE = '━'

@@ -8,10 +8,11 @@ import { PALETTE } from './palette'
 
 const COVER_MS = 20_000
 const SVG = 'http://www.w3.org/2000/svg'
+const JPEG_PIXEL_FORMAT = 'yuvj420p'
 
-async function converted($: EngineInterface, mpv: string, source: string, target: string) {
+async function converted($: EngineInterface, mpv: string, source: string, target: string, pixelFormat: string | null) {
   try {
-    const { exitCode } = await $.process.run(coverArgv(mpv, source, target, COVER_PIXELS), { timeoutMs: COVER_MS })
+    const { exitCode } = await $.process.run(coverArgv(mpv, source, target, COVER_PIXELS, pixelFormat), { timeoutMs: COVER_MS })
     return exitCode === 0 && (await $.fs.exists(target))
   } catch {
     return false
@@ -24,8 +25,8 @@ export async function coverOf($: EngineInterface, mpv: string, places: Places, t
   }
 
   const [hasPng, hasJpeg] = await Promise.all([
-    converted($, mpv, track.thumbnail, places.coverPng),
-    converted($, mpv, track.thumbnail, places.coverJpeg),
+    converted($, mpv, track.thumbnail, places.coverPng, null),
+    converted($, mpv, track.thumbnail, places.coverJpeg, JPEG_PIXEL_FORMAT),
   ])
   const jpeg = hasJpeg ? (await $.fs.read(places.coverJpeg, { as: 'bytes' })).base64 : null
 

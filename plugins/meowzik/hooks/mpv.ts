@@ -52,12 +52,12 @@ export const playerArgv = (request: PlayRequest) => {
   ]
 }
 
-export const coverArgv = (mpv: string, source: string, target: string, pixels: number) => [
+export const coverArgv = (mpv: string, source: string, target: string, pixels: number, pixelFormat: string | null) => [
   mpv,
   '--no-config',
   '--no-terminal',
   '--frames=1',
-  `--vf=lavfi=[scale=${pixels}:${pixels}:force_original_aspect_ratio=increase,crop=${pixels}:${pixels}]`,
+  `--vf=lavfi=[scale=${pixels}:${pixels}:force_original_aspect_ratio=increase,crop=${pixels}:${pixels}${pixelFormat ? `,format=${pixelFormat}` : ''}]`,
   `--o=${target}`,
   '--',
   source,

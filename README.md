@@ -35,13 +35,13 @@ See [`plugins/chess`](plugins/chess) for the code and its tests.
 **meowzik** is the Meowzik Discord bot as a Claude Code mod: the same player, the same buttons, in a pane next to the chat, and without Discord's limits (no cap on the queue, the history, the favorites or a playlist).
 
 - **Any source:** a song name (searched on YouTube, or SoundCloud if you pick it), a YouTube or SoundCloud link, a whole YouTube playlist or SoundCloud set, a Spotify track, album or playlist (each song is looked up when it plays), or a Suno song.
-- **The bot's controls:** Back, Pause, Skip, Stop, Loop (off, track, queue), Shuffle, Autoplay, Add song and Favorite, plus volume and a progress bar you click to jump.
+- **Player controls:** the bot's buttons as a player's, with icons (⏮ ▶ ⏭ ⏹, then shuffle, loop for the queue or the track, autoplay and favorite, lit while on), a thick progress bar you drag to seek and a volume slider you drag or move with the arrows.
 - **Autoplay:** when the queue runs out it follows YouTube's mix or SoundCloud's recommendations for what you were listening to, skipping what already played in the session.
 - **Lists without limits:** Queue, History and Favorites in tabs, page by page; press a song to play it now, queue it, move it, remove it or favorite it. They are kept in `~/.claude/meowzik/lists`, so they survive the session.
 - **Claude plays too:** ask for music and Claude uses the mod's tools (`play`, `control`, `status`, `list`), so "play some Daft Punk", "skip this" or "what is playing?" just work.
 - **Installs what is missing:** the first song brings mpv, the standalone yt-dlp (it carries the scripts that solve YouTube's challenges) and, when there is no deno, Node.js or Bun to run them, deno; all into `~/.claude/meowzik/bin` (on macOS mpv and deno come from Homebrew when it is there; on Linux it shows the command for mpv). Nothing else on your system changes.
 - **YouTube's bot check:** when YouTube asks to confirm you are not a bot, point the mod at a cookies file (or a browser) in `/config`; like the bot it works on a copy and keeps the session YouTube rotates. Or switch the search source to SoundCloud, which needs no login.
-- **Every surface:** the cover, a clickable progress bar and the field to add songs in the terminal and the desktop app; the field and seek buttons in VS Code; the player, the lists and Claude's tools in the phone app.
+- **Every surface:** the cover, the draggable progress and volume sliders and the field to add songs in the terminal and the desktop app; the field with seek and volume buttons in VS Code; the player, the lists and Claude's tools in the phone app.
 
 Settings (in `/config`, under meowzik): the search source, the YouTube cookies file or browser, extra yt-dlp arguments, and the mpv and yt-dlp paths if you want your own.
 

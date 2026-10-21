@@ -28,8 +28,8 @@ test('mpv gets the script, an escaped control path, the headers and the stream a
   ).not.toContain('--pause')
 })
 
-test('a cover is one cropped frame mpv writes', () => {
-  expect(coverArgv('mpv', 'https://i.ytimg.com/vi/x/hqdefault.jpg', '/tmp/cover.png', 240)).toEqual([
+test('a cover is one cropped frame mpv writes, full-range for the JPEG encoder', () => {
+  expect(coverArgv('mpv', 'https://i.ytimg.com/vi/x/hqdefault.jpg', '/tmp/cover.png', 240, null)).toEqual([
     'mpv',
     '--no-config',
     '--no-terminal',
@@ -39,6 +39,9 @@ test('a cover is one cropped frame mpv writes', () => {
     '--',
     'https://i.ytimg.com/vi/x/hqdefault.jpg',
   ])
+  expect(coverArgv('mpv', 'https://i.ytimg.com/vi_webp/x/maxresdefault.webp', '/tmp/cover.jpg', 240, 'yuvj420p')).toContain(
+    '--vf=lavfi=[scale=240:240:force_original_aspect_ratio=increase,crop=240:240,format=yuvj420p]',
+  )
 })
 
 test('the script reports are read across split chunks', () => {

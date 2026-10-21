@@ -30,7 +30,7 @@ A change to a plugin bumps its version in both `plugin.json` and its marketplace
 
 ## MCP servers
 
-A plugin's `.mcp.json` starts its server. When the server's code lives in another repo (a Python server in `custom-mcps`, say), launch it from there with `uvx --from git+https://github.com/<owner>/<repo>#subdirectory=<path> <script>` instead of copying the code in: uvx resolves workspace dependencies from the clone, and a cached start takes under two seconds.
+A plugin's `.mcp.json` starts its server. When the server's code lives in another repo, launch it from there with `uvx --from git+https://github.com/<owner>/<repo>#subdirectory=<path> <script>` instead of copying the code in: uvx resolves workspace dependencies from the clone, and a cached start takes under two seconds.
 
 ## Developing
 

@@ -2,6 +2,9 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 import type { On, ProcessRunResult, ProcessSpawnChunk, ProcessSpawnResult } from 'claude-code'
 
+import { ICONS } from './icons'
+import type { SliderProps } from './slider'
+
 const HOME = 'C:\\Users\\me'
 const DATA = `${HOME}\\.claude\\meowzik`
 const MPV = `${DATA}\\bin\\mpv\\mpv.exe`
@@ -55,6 +58,8 @@ const ran = (stdout = '', exitCode = 0): { value: ProcessRunResult } => ({
 })
 
 const line = (text: string): ProcessSpawnChunk => ({ stream: 'stdout', text: `${text}\n` })
+
+const keyOf = (path: string) => path.slice(Math.max(0, path.indexOf(HOME)))
 
 const isYtdlp = (argv: readonly string[]) => argv[0] === YTDLP && argv[1] !== '--version'
 
@@ -127,11 +132,11 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
   on('tool.register', (_, e) => ({ value: { tool: `mcp__meowzik__${e.name}` } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.status', (_, e) => (statuses.push(e.text), { value: undefined }))
-  on('fs.exists', (_, e) => ({ value: files.has(e.path) }))
-  on('fs.write', (_, e) => (files.set(e.path, e.text), { value: undefined }))
-  on('fs.stat', (_, e) => ({ value: { kind: 'file', size: (files.get(e.path) ?? '').length, mtimeMs: 0, isLink: false } }))
+  on('fs.exists', (_, e) => ({ value: files.has(keyOf(e.path)) }))
+  on('fs.write', (_, e) => (files.set(keyOf(e.path), e.text), { value: undefined }))
+  on('fs.stat', (_, e) => ({ value: { kind: 'file', size: (files.get(keyOf(e.path)) ?? '').length, mtimeMs: 0, isLink: false } }))
   on('fs.read', (_, e) => {
-    const text = e.path.endsWith(LOGO) ? 'logo' : files.get(e.path)
+    const text = e.path.endsWith(LOGO) ? 'logo' : files.get(keyOf(e.path))
     if (text === undefined) {
       throw new Error(`ENOENT ${e.path}`)
     }
@@ -195,6 +200,9 @@ const texts = async (ui: { findAll: (query: { type: string }) => Promise<{ text:
 const labelOf = async (ui: { find: (query: { key: string }) => Promise<{ props: Record<string, unknown> } | undefined> }, key: string) =>
   (await ui.find({ key }))?.props.label
 
+const sliderOf = async (ui: { find: (query: { key: string }) => Promise<{ props: Record<string, unknown> } | undefined> }, key: string) =>
+  (await ui.find({ key }))?.props.props as SliderProps | undefined
+
 const callTool = async ($: Engine, tool: string, input: Record<string, unknown>) => {
   const answered = await $.tool.call({ tool: `mcp__meowzik__${tool}`, ...input })
 
@@ -218,13 +226,14 @@ test('a song name plays at once, pauses through the control file, and ends in th
   expect(machine.statuses.at(-1)).toBe('Playing: One More Time')
 
   await clock.advance(1000)
-  expect(await texts(ui)).toContain('0:01 / 0:03')
+  expect(await sliderOf(ui, 'seekbar')).toMatchObject({ mode: 'seek', fraction: 1 / 3, total: 3, endLabel: '0:03', isEnabled: true })
+  expect(await labelOf(ui, 'pause')).toBe(ICONS.pause)
 
   await ui.press({ key: 'pause' })
   expect(machine.control()).toMatchObject({ pause: true })
-  expect(await labelOf(ui, 'pause')).toBe('Resume')
+  expect(await labelOf(ui, 'pause')).toBe(ICONS.play)
   await clock.advance(1000)
-  expect(await texts(ui)).toContain('0:01 / 0:03')
+  expect(await sliderOf(ui, 'seekbar')).toMatchObject({ fraction: 1 / 3 })
 
   await ui.press({ key: 'pause' })
   await clock.advance(3000)
@@ -239,7 +248,7 @@ test('a song name plays at once, pauses through the control file, and ends in th
 test('songs added while one plays wait in the queue, and the list, Back and Skip move between them', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   world(on, clock)
-  const ui = await start($, 'terminal')
+  const ui = await start($, 'desktop')
 
   await ui.input({ key: 'add', text: 'daft punk' })
   await ui.input({ key: 'add', text: 'get lucky' })
@@ -247,7 +256,7 @@ test('songs added while one plays wait in the queue, and the list, Back and Skip
 
   expect(await labelOf(ui, 'tab:queue')).toBe('Queue (2)')
   expect(await texts(ui)).toContain('Next: Get Lucky')
-  expect((await ui.find({ type: 'Image' }))?.props.source).toMatchObject({ file: `${DATA}\\run\\cover.png`, format: 'png' })
+  expect((await ui.find({ type: 'Svg' }))?.props.source).toContain('data:image/jpeg;base64,')
 
   await ui.press({ key: 'queue:play:1' })
   expect((await ui.find({ type: 'Link' }))?.props.label).toBe('Around the World')
@@ -274,7 +283,8 @@ test('loop track plays the song again, and favorites keep it for later sessions'
   const ui = await start($, 'desktop')
 
   await ui.press({ key: 'loop' })
-  expect(await labelOf(ui, 'loop')).toBe('Loop: Track')
+  expect(await labelOf(ui, 'loop')).toBe(ICONS.loopTrack)
+  expect((await ui.find({ key: 'loop' }))?.props.variant).toBe('primary')
   await ui.input({ key: 'add', text: 'get lucky' })
   await ui.press({ key: 'favorite' })
   expect(await texts(ui)).toContain('Added to favorites: Get Lucky')
@@ -313,10 +323,12 @@ test('a fresh session reads the lists and the settings back', async ($, on) => {
   const ui = await start($, 'desktop')
 
   expect(await labelOf(ui, 'tab:queue')).toBe('Queue (1)')
-  expect(await labelOf(ui, 'loop')).toBe('Loop: Queue')
-  expect(await texts(ui)).toContain('Loop: Queue · Shuffle: Off · Autoplay: Off · Volume: 40%')
-  expect(await texts(ui)).toContain('Press Play to start the queue.')
-  expect(await labelOf(ui, 'pause')).toBe('Play')
+  expect(await labelOf(ui, 'loop')).toBe(ICONS.loop)
+  expect((await ui.find({ key: 'loop' }))?.props.variant).toBe('primary')
+  expect((await ui.find({ key: 'shuffle' }))?.props.variant).toBe('secondary')
+  expect(await sliderOf(ui, 'volume')).toMatchObject({ mode: 'volume', fraction: 0.4 })
+  expect(await labelOf(ui, 'pause')).toBe(ICONS.play)
+  expect(await texts(ui)).toContain(`Press ${ICONS.play} to start the queue.`)
 
   await ui.press({ key: 'pause' })
   expect((await ui.find({ type: 'Link' }))?.props.label).toBe('One More Time')
@@ -366,6 +378,35 @@ test('a YouTube bot check keeps the song queued and says how to get past it', as
   expect(await callTool($, 'play', { query: 'daft punk' })).toContain('Could not play One More Time: YouTube asked to confirm')
   expect(await labelOf(ui, 'tab:queue')).toBe('Queue (1)')
   expect(await callTool($, 'status', {})).toContain('Could not play One More Time')
+
+  await ui.unmount()
+})
+
+test('the sliders seek by dragging and set the volume live, and the arrows step them', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock)
+  const ui = await start($, 'desktop')
+
+  await ui.input({ key: 'add', text: 'daft punk' })
+  await ui.resize({ columns: 100, rows: 2, in: 'seekbar' })
+  await ui.resize({ columns: 30, rows: 1, in: 'volume' })
+
+  await ui.pointer({ type: 'down', button: 'left', x: 20, y: 0, in: 'seekbar' })
+  await ui.pointer({ type: 'move', button: 'left', x: 60, y: 0, in: 'seekbar' })
+  expect(machine.control()).toMatchObject({ seek: { id: 0 } })
+  expect(await ui.find({ type: 'Text', text: '0:01', in: 'seekbar' })).toBeDefined()
+  await ui.pointer({ type: 'up', button: 'left', x: 60, y: 0, in: 'seekbar' })
+  expect(machine.control()).toMatchObject({ seek: { id: 1 } })
+  expect(Math.round((machine.control().seek as { to: number }).to * 1000)).toBe(1815)
+
+  await ui.pointer({ type: 'down', button: 'left', x: 4, y: 0, in: 'volume' })
+  expect(machine.control()).toMatchObject({ volume: 2 })
+  await ui.pointer({ type: 'move', button: 'left', x: 25, y: 0, in: 'volume' })
+  expect(machine.control()).toMatchObject({ volume: 100 })
+  await ui.pointer({ type: 'up', button: 'left', x: 25, y: 0, in: 'volume' })
+  await ui.key({ key: 'left', in: 'volume' })
+  expect(machine.control()).toMatchObject({ volume: 95 })
+  expect(await ui.find({ type: 'Text', text: '95%', in: 'volume' })).toBeDefined()
 
   await ui.unmount()
 })
