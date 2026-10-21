@@ -1,0 +1,22 @@
+{
+  "name": "claude-mods",
+  "description": "Claude Code mods by jahirtrap: panes, games and tools built on function hooks.",
+  "owner": {
+    "name": "jahirtrap",
+    "url": "https://github.com/jahirxtrap"
+  },
+  "plugins": [
+    {
+      "name": "chess",
+      "description": "Chess against Claude in a pane, any time: click a piece and its square, Claude thinks and answers in a few seconds. English and Spanish.",
+      "version": "0.2.0",
+      "source": "./mods/chess",
+      "category": "Games",
+      "tags": [
+        "pane",
+        "game",
+        "command"
+      ]
+    }
+  ]
+}

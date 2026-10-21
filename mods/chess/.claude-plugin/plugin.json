@@ -1,0 +1,10 @@
+{
+  "name": "chess",
+  "version": "0.2.0",
+  "description": "Chess against Claude in a pane, any time, without taking a chat turn",
+  "author": {
+    "name": "jahirtrap",
+    "url": "https://github.com/jahirxtrap"
+  },
+  "types": "./types/index.d.ts"
+}
