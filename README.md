@@ -46,7 +46,13 @@ Each plugin keeps Claude Code's own layout inside its folder (`hooks/` for a mod
 
 ## Install
 
-Add the marketplace once and install the plugins you want:
+One plugin, in one step (Claude Code 2.1.275 or later):
+
+```
+/plugin install chess --marketplace jahirxtrap/claude-toolkit
+```
+
+Or add the marketplace once and install the plugins you want:
 
 ```sh
 claude plugin marketplace add jahirxtrap/claude-toolkit

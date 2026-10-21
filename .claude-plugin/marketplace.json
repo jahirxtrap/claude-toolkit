@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "chess",
-      "description": "Chess against Claude in a pane, any time: click a piece and its square, Claude thinks and answers in a few seconds. English and Spanish.",
+      "description": "Chess against Claude in a pane, any time, without taking a chat turn: click a piece and its square, Claude thinks and answers in a few seconds. English and Spanish.",
       "version": "0.2.0",
       "source": "./plugins/chess",
       "category": "Games",
