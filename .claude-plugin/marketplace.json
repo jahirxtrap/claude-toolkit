@@ -1,6 +1,6 @@
 {
-  "name": "claude-mods",
-  "description": "Claude Code mods by jahirtrap: panes, games and tools built on function hooks.",
+  "name": "claude-toolkit",
+  "description": "A general-use toolkit of Claude Code plugins by jahirtrap: mods, MCP servers, skills and commands, each installed on its own.",
   "owner": {
     "name": "jahirtrap",
     "url": "https://github.com/jahirxtrap"
@@ -10,9 +10,10 @@
       "name": "chess",
       "description": "Chess against Claude in a pane, any time: click a piece and its square, Claude thinks and answers in a few seconds. English and Spanish.",
       "version": "0.2.0",
-      "source": "./mods/chess",
+      "source": "./plugins/chess",
       "category": "Games",
       "tags": [
+        "mod",
         "pane",
         "game",
         "command"

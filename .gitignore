@@ -1,6 +1,6 @@
-# Written by Claude Code when it loads a mod from a folder
-mods/*/.claude-plugin/types/
-mods/*/tsconfig.json
+# Written by Claude Code when it loads a plugin from a folder
+plugins/*/.claude-plugin/types/
+plugins/*/tsconfig.json
 
 # Dependencies and editors
 node_modules/

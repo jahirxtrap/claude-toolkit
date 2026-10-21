@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  mods:
+  plugins:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -31,5 +31,5 @@ jobs:
       - name: Install Claude Code
         run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 
-      - name: Validate the marketplace, then validate and test every mod
+      - name: Validate the marketplace, then validate and test every plugin
         run: bash scripts/check.sh
