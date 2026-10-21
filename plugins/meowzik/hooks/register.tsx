@@ -8,7 +8,7 @@ import { checkTools, factsOf } from './setup'
 import { get, put, tell } from './state'
 import { problemText, say } from './text'
 import { answerTool, TOOL_SPECS } from './tools'
-import { drawPane, openPane, PANE, SEEKBAR, VOLUME } from './view'
+import { drawBand, drawPane, MINI_SEEKBAR, openPane, PANE, SEEKBAR, VOLUME } from './view'
 import { cookieNoticeOf, cookieStateOf } from './ytdlp'
 
 const isFraction = (data: unknown): data is { fraction: number } => typeof (data as { fraction?: unknown } | null)?.fraction === 'number'
@@ -73,9 +73,11 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__meowzik__list' }, ($, e) => served($, 'list', e))
 
   on('ui.message', async ($, e) => {
-    if (e.element === SEEKBAR && isFraction(e.data)) {
+    const isSeekbar = e.element === SEEKBAR || e.element === MINI_SEEKBAR
+
+    if (isSeekbar && isFraction(e.data)) {
       await seekTo($, e.data.fraction * (await get($, 'length')))
-    } else if (e.element === SEEKBAR && isStep(e.data)) {
+    } else if (isSeekbar && isStep(e.data)) {
       await seekBy($, e.data.step * SEEK_KEY_SECONDS)
     } else if (e.element === VOLUME && isFraction(e.data)) {
       await setVolume($, e.data.fraction * VOLUME_MAX)
@@ -87,4 +89,20 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, ($, e) => drawPane($, e, session))
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const band = await drawBand($, e)
+    if (!band) {
+      return next(e)
+    }
+
+    const { Box } = $.ui.resolve(e)
+
+    return (
+      <Box flexDirection="column">
+        {band}
+        {await next(e)}
+      </Box>
+    )
+  })
 }

@@ -14,6 +14,7 @@ export const ICONS = {
   autoplay: icon('∞'),
   favorite: icon('☆'),
   favorited: icon('★'),
+  note: icon('♪'),
   quieter: '−',
   louder: '+',
 } as const

@@ -6,6 +6,7 @@ import { clockOf, say } from './text'
 
 export type SliderProps = {
   mode: 'seek' | 'volume'
+  layout: 'stacked' | 'inline'
   fraction: number
   total: number
   label: string
@@ -21,11 +22,17 @@ const STEPS: Partial<Record<string, number>> = { left: -1, right: 1 }
 
 const clamped = (value: number) => Math.min(1, Math.max(0, value))
 
+const valueOf = (props: SliderProps, fraction: number) =>
+  props.mode === 'volume'
+    ? say('percent', { value: Math.round(fraction * props.total) })
+    : say('progress', { position: clockOf(fraction * props.total), length: props.endLabel })
+
 const geometryOf = (props: SliderProps, columns: number) => {
   const barStart = props.label ? props.label.length + 1 : 0
-  const valueColumns = props.mode === 'volume' ? SLIDER_VALUE_COLUMNS : 0
+  const valueColumns =
+    props.layout === 'stacked' ? 0 : props.mode === 'volume' ? SLIDER_VALUE_COLUMNS : valueOf(props, 1).length + 1
 
-  return { barStart, barColumns: Math.max(1, columns - barStart - valueColumns) }
+  return { barStart, barColumns: Math.max(1, columns - barStart - valueColumns), valueColumns }
 }
 
 const fractionAt = (live: Live, x: number) => clamped((x - live.barStart) / live.barColumns)
@@ -67,7 +74,8 @@ const listen = (surface: ClientSurface<SliderState>) => {
 
 const Slider: ClientModule<SliderProps, SliderState> = (props, surface) => {
   const { Box, Text } = surface.elements
-  const live: Live = { props, ...geometryOf(props, surface.columns) }
+  const geometry = geometryOf(props, surface.columns)
+  const live: Live = { props, barStart: geometry.barStart, barColumns: geometry.barColumns }
 
   if (surface.state === undefined) {
     listen(surface)
@@ -90,7 +98,7 @@ const Slider: ClientModule<SliderProps, SliderState> = (props, surface) => {
     </Box>
   )
 
-  if (props.mode === 'volume') {
+  if (props.layout === 'inline') {
     return (
       <Box flexDirection="row" alignItems="center">
         {props.label && (
@@ -99,9 +107,9 @@ const Slider: ClientModule<SliderProps, SliderState> = (props, surface) => {
           </Box>
         )}
         {bar}
-        <Box width={SLIDER_VALUE_COLUMNS} height={1} justifyContent="flex-end">
+        <Box width={geometry.valueColumns} height={1} justifyContent="flex-end">
           <Text tabular dimColor>
-            {say('percent', { value: Math.round(shown * props.total) })}
+            {valueOf(props, shown)}
           </Text>
         </Box>
       </Box>

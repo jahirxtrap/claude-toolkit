@@ -36,6 +36,8 @@ See [`plugins/chess`](plugins/chess) for the code and its tests.
 
 - **Any source:** a song name (searched on YouTube, or SoundCloud if you pick it), a YouTube or SoundCloud link, a whole YouTube playlist or SoundCloud set, a Spotify track, album or playlist (each song is looked up when it plays), or a Suno song.
 - **Player controls:** the bot's buttons as a player's, with icons (⏮ ▶ ⏭ ⏹, then shuffle, loop for the queue or the track, autoplay and favorite, lit while on), a thick progress bar you drag to seek and a volume slider you drag or move with the arrows.
+- **Mini player:** a one-row player above the prompt (back, play or pause, skip, stop, the song and its progress bar); the song opens the pane. Show it while music plays, always or never, and keep or hide the song in the status line, from the pane's Setup tab.
+- **Lyrics:** a Lyrics tab with the song's lyrics from [LRCLIB](https://lrclib.net), synced lines lit as they are sung; press a line to jump to it. When LRCLIB has none, a YouTube song uses the video's own subtitles, then its automatic captions.
 - **Autoplay:** when the queue runs out it follows YouTube's mix or SoundCloud's recommendations for what you were listening to, skipping what already played in the session.
 - **Lists without limits:** Queue, History and Favorites in tabs, page by page; press a song to play it now, queue it, move it, remove it or favorite it. They are kept in `~/.claude/meowzik/lists`, so they survive the session.
 - **Claude plays too:** ask for music and Claude uses the mod's tools (`play`, `control`, `status`, `list`), so "play some Daft Punk", "skip this" or "what is playing?" just work.

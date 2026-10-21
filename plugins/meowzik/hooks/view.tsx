@@ -1,15 +1,21 @@
 import type { EngineInterface, RenderInput } from 'claude-code'
 
-import type { Phase, Setup, Tab, Track } from '../types'
+import type { Lyrics, LyricsSource, MiniPlayer, Phase, Setup, Tab, Track } from '../types'
 import type { Session } from './config'
 import { pictureSvgOf } from './cover'
 import { ICONS } from './icons'
 import {
+  BAND_CONTROLS_COLUMNS,
+  BAND_SEEK_COLUMNS,
+  BAND_TITLE_MIN_COLUMNS,
   barOf,
   COVER_COLUMNS,
   COVER_ROWS,
   COVER_SVG_SIZE,
   GAP,
+  LYRICS_AFTER,
+  LYRICS_BEFORE,
+  LYRICS_LEAD_SECONDS,
   PAGE_SIZE,
   PANE_ROWS,
   SEEK_BUTTON_SECONDS,
@@ -20,6 +26,7 @@ import {
   VOLUME_MAX,
   VOLUME_STEP,
 } from './layout'
+import { lineAt } from './lyrics'
 import { PALETTE } from './palette'
 import {
   addSongs,
@@ -30,8 +37,12 @@ import {
   enqueueFrom,
   moveInQueue,
   playFrom,
+  refreshLyrics,
   removeFrom,
   seekBy,
+  seekTo,
+  setMiniPlayer,
+  setShowsStatus,
   skip,
   stop,
   toggleAutoplay,
@@ -45,20 +56,30 @@ import type { ListName } from './shelf'
 import type { SliderProps } from './slider'
 import { set, snapshot } from './state'
 import type { Values } from './state'
-import { clockOf, lengthOf, noticeTextOf, say, titleOf } from './text'
+import { clipped, clockOf, lengthOf, noticeTextOf, say, titleOf } from './text'
 import type { TextKey } from './text'
 
 export const PANE = 'meowzik'
 export const SEEKBAR = 'seekbar'
+export const MINI_SEEKBAR = 'miniSeekbar'
 export const VOLUME = 'volume'
 
 type Pane = RenderInput<'Pane'>
 
+type Band = RenderInput<'AbovePrompt'>
+
+type Choice = { value: string; label: string }
+
+const MINI_PLAYERS: Record<MiniPlayer, TextKey> = { playing: 'miniPlayerPlaying', always: 'miniPlayerAlways', off: 'miniPlayerOff' }
+const LYRICS_CREDITS: Record<LyricsSource, TextKey> = { lrclib: 'lyricsCredit', subtitles: 'lyricsSubtitles', captions: 'lyricsCaptions' }
+const SWITCH_ON = 'on'
+const SWITCH_OFF = 'off'
+
 const REQUESTERS: Record<Track['requestedBy'], TextKey> = { you: 'requesterYou', claude: 'requesterClaude', autoplay: 'requesterAutoplay' }
 const HEADINGS: Record<Exclude<Phase, 'idle'>, TextKey> = { playing: 'nowPlaying', paused: 'paused', loading: 'loading' }
-const TABS: readonly Tab[] = ['queue', 'history', 'favorites', 'setup']
-const TAB_KEYS: Record<Tab, string> = { queue: '1', history: '2', favorites: '3', setup: '4' }
-const TAB_LISTS: Record<Exclude<Tab, 'setup'>, ListName> = { queue: 'queue', history: 'played', favorites: 'favorites' }
+const TABS: readonly Tab[] = ['queue', 'history', 'favorites', 'lyrics', 'setup']
+const TAB_KEYS: Record<Tab, string> = { queue: '1', history: '2', favorites: '3', lyrics: '4', setup: '5' }
+const TAB_LISTS: Record<Exclude<Tab, 'lyrics' | 'setup'>, ListName> = { queue: 'queue', history: 'played', favorites: 'favorites' }
 const EMPTY: Record<ListName, TextKey> = { queue: 'emptyQueue', played: 'emptyHistory', favorites: 'emptyFavorites' }
 const logos = new Map<string, string>()
 
@@ -161,21 +182,23 @@ function heading($: EngineInterface, e: Pane, view: Values) {
 
 const isLive = (view: Values) => view.phase === 'playing' || view.phase === 'paused'
 
+const seekPropsOf = (view: Values, layout: SliderProps['layout']): SliderProps => ({
+  mode: 'seek',
+  layout,
+  fraction: view.length > 0 ? view.position / view.length : 0,
+  total: view.length,
+  label: '',
+  endLabel: lengthOf(view.length),
+  isEnabled: isLive(view) && view.length > 0,
+})
+
 function progress($: EngineInterface, e: Pane, view: Values) {
   const { Box, Button, Text } = $.ui.resolve(e)
 
   if (e.surface === 'terminal' || e.surface === 'desktop') {
     const { Client } = $.ui.resolve(e)
-    const props: SliderProps = {
-      mode: 'seek',
-      fraction: view.length > 0 ? view.position / view.length : 0,
-      total: view.length,
-      label: '',
-      endLabel: lengthOf(view.length),
-      isEnabled: isLive(view) && view.length > 0,
-    }
 
-    return <Client key={SEEKBAR} module="./slider.tsx" props={props} width={e.props.bodyColumns} height={SEEK_ROWS} />
+    return <Client key={SEEKBAR} module="./slider.tsx" props={seekPropsOf(view, 'stacked')} width={e.props.bodyColumns} height={SEEK_ROWS} />
   }
 
   const bar = barOf(TEXT_BAR_COLUMNS, view.position, view.length)
@@ -229,6 +252,7 @@ function volumeControl($: EngineInterface, e: Pane, view: Values) {
     const { Client } = $.ui.resolve(e)
     const props: SliderProps = {
       mode: 'volume',
+      layout: 'inline',
       fraction: view.volume / VOLUME_MAX,
       total: VOLUME_MAX,
       label: say('volumeShort'),
@@ -281,6 +305,7 @@ function tabs($: EngineInterface, e: Pane, view: Values) {
     queue: say('tabQueue', { count: view.queue.length }),
     history: say('tabHistory', { count: view.played.length }),
     favorites: say('tabFavorites', { count: view.favorites.length }),
+    lyrics: say('tabLyrics'),
     setup: say('tabSetup'),
   }
 
@@ -393,6 +418,54 @@ function toolRows($: EngineInterface, e: Pane, tools: Setup) {
   )
 }
 
+function choice($: EngineInterface, e: Pane, key: string, label: string, options: readonly Choice[], value: string, onPick: (value: string) => void) {
+  if (e.surface === 'mobile') {
+    const { Box, Button, Text } = $.ui.resolve(e)
+
+    return (
+      <Box columnGap={GAP} rowGap={GAP} flexWrap="wrap" alignItems="center">
+        <Text dimColor>{label}</Text>
+        {options.map(option => (
+          <Button
+            key={`${key}:${option.value}`}
+            variant={variantOf(option.value === value)}
+            label={option.label}
+            onPress={() => onPick(option.value)}
+          />
+        ))}
+      </Box>
+    )
+  }
+
+  const { Select } = $.ui.resolve(e)
+
+  return <Select key={key} label={label} options={options} value={value} onSelect={picked => onPick(picked)} />
+}
+
+function playerSettings($: EngineInterface, e: Pane, view: Values) {
+  const { Box, Text } = $.ui.resolve(e)
+  const players = (Object.keys(MINI_PLAYERS) as MiniPlayer[]).map(player => ({ value: player, label: say(MINI_PLAYERS[player]) }))
+  const switches = [
+    { value: SWITCH_ON, label: say('modeOn') },
+    { value: SWITCH_OFF, label: say('modeOff') },
+  ]
+
+  return (
+    <Box flexDirection="column" rowGap={GAP}>
+      <Text weight="bold">{say('setupPlayer')}</Text>
+      {choice($, e, 'miniPlayer', say('miniPlayerLabel'), players, view.miniPlayer, picked => {
+        const player = (Object.keys(MINI_PLAYERS) as MiniPlayer[]).find(option => option === picked)
+        if (player) {
+          void setMiniPlayer($, player)
+        }
+      })}
+      {choice($, e, 'statusLine', say('statusLineLabel'), switches, view.showsStatus ? SWITCH_ON : SWITCH_OFF, picked =>
+        void setShowsStatus($, picked === SWITCH_ON),
+      )}
+    </Box>
+  )
+}
+
 function setupView($: EngineInterface, e: Pane, view: Values, session: Session | null) {
   const { Box, Button, Text } = $.ui.resolve(e)
   const tools = view.setup
@@ -400,6 +473,7 @@ function setupView($: EngineInterface, e: Pane, view: Values, session: Session |
 
   return (
     <Box flexDirection="column" rowGap={GAP}>
+      {playerSettings($, e, view)}
       <Text weight="bold">{say('setupTools')}</Text>
       {toolRows($, e, tools)}
       {isMissing && <Text dimColor>{tools.canBrew ? say('installBrew') : say('installWhere', { folder: tools.folder })}</Text>}
@@ -425,6 +499,116 @@ function setupView($: EngineInterface, e: Pane, view: Values, session: Session |
   )
 }
 
+function lyricLines($: EngineInterface, e: Pane, view: Values, lyrics: Lyrics) {
+  const { Box, Button, Text } = $.ui.resolve(e)
+  const shown = lineAt(lyrics.lines, view.position + LYRICS_LEAD_SECONDS)
+  const first = Math.max(0, shown - LYRICS_BEFORE)
+  const rows = lyrics.lines.slice(first, Math.max(shown, 0) + LYRICS_AFTER + 1)
+
+  return (
+    <Box flexDirection="column">
+      <Text dimColor>{say('lyricsHint')}</Text>
+      {rows.map((line, offset) => {
+        const index = first + offset
+        const isNow = index === shown
+
+        return (
+          <Button key={`lyric:${index}`} plain onPress={() => void seekTo($, line.at)}>
+            <Text weight={isNow ? 'bold' : 'regular'} {...(isNow ? { color: PALETTE.accent } : { dimColor: true })}>
+              {line.text || ICONS.note}
+            </Text>
+          </Button>
+        )
+      })}
+    </Box>
+  )
+}
+
+function lyricsView($: EngineInterface, e: Pane, view: Values) {
+  const { Box, Button, Text } = $.ui.resolve(e)
+  const track = view.current
+  const lyrics = track && view.lyrics?.trackId === track.id ? view.lyrics : null
+
+  if (!track) {
+    return <Text dimColor>{say('lyricsIdle')}</Text>
+  }
+  if (!lyrics || lyrics.status === 'loading') {
+    return <Text dimColor>{say('lyricsLoading')}</Text>
+  }
+  if (lyrics.status === 'unreachable') {
+    return (
+      <Box columnGap={GAP} alignItems="center" flexWrap="wrap">
+        <Text color={PALETTE.error}>{say('lyricsUnreachable')}</Text>
+        <Button key="lyrics:retry" dimColor label={say('lyricsRetry')} onPress={() => void refreshLyrics($, track)} />
+      </Box>
+    )
+  }
+  if (lyrics.status !== 'found') {
+    return <Text dimColor>{say(lyrics.status === 'instrumental' ? 'lyricsInstrumental' : 'lyricsMissing')}</Text>
+  }
+
+  return (
+    <Box flexDirection="column" rowGap={GAP}>
+      {lyrics.isSynced ? (
+        lyricLines($, e, view, lyrics)
+      ) : (
+        <Box flexDirection="column">
+          <Text dimColor>{say('lyricsUnsynced')}</Text>
+          {lyrics.lines.map((line, index) => (
+            <Text key={`lyric:${index}`}>{line.text || ' '}</Text>
+          ))}
+        </Box>
+      )}
+      {lyrics.source && <Text dimColor>{say(LYRICS_CREDITS[lyrics.source])}</Text>}
+    </Box>
+  )
+}
+
+function miniSeek($: EngineInterface, e: Band, view: Values, columns: number) {
+  if (e.surface === 'terminal' || e.surface === 'desktop') {
+    const { Client } = $.ui.resolve(e)
+
+    return <Client key={MINI_SEEKBAR} module="./slider.tsx" props={seekPropsOf(view, 'inline')} width={columns} height={1} />
+  }
+
+  const { Text } = $.ui.resolve(e)
+
+  return (
+    <Text tabular dimColor>
+      {say('progress', { position: clockOf(view.position), length: lengthOf(view.length) })}
+    </Text>
+  )
+}
+
+export async function drawBand($: EngineInterface, e: Band) {
+  if (e.props.hasSurvey) {
+    return null
+  }
+
+  const view = await snapshot($)
+  const isActive = view.current !== null || view.phase !== 'idle'
+  if (view.miniPlayer === 'off' || (view.miniPlayer === 'playing' && !isActive)) {
+    return null
+  }
+
+  const { Box, Button } = $.ui.resolve(e)
+  const isSounding = view.phase === 'playing' || view.phase === 'loading'
+  const seekColumns = view.current ? Math.min(BAND_SEEK_COLUMNS, Math.floor(e.props.bodyColumns / 2)) : 0
+  const titleColumns = Math.max(BAND_TITLE_MIN_COLUMNS, e.props.bodyColumns - BAND_CONTROLS_COLUMNS - seekColumns)
+  const title = say('miniTitle', { note: ICONS.note, title: view.current ? titleOf(view.current) : say('paneTitle') })
+
+  return (
+    <Box flexDirection="row" columnGap={GAP} alignItems="center">
+      <Button key="mini:back" plain label={ICONS.back} onPress={() => void back($)} />
+      <Button key="mini:pause" plain label={isSounding ? ICONS.pause : ICONS.play} onPress={() => void togglePause($)} />
+      <Button key="mini:skip" plain label={ICONS.next} onPress={() => void skip($)} />
+      <Button key="mini:stop" plain label={ICONS.stop} onPress={() => void stop($)} />
+      <Button key="mini:open" plain label={clipped(title, titleColumns)} onPress={() => void openPane($)} />
+      {view.current && miniSeek($, e, view, seekColumns)}
+    </Box>
+  )
+}
+
 export async function drawPane($: EngineInterface, e: Pane, session: Session | null) {
   const { Box, Text } = $.ui.resolve(e)
   const view = await snapshot($)
@@ -443,7 +627,11 @@ export async function drawPane($: EngineInterface, e: Pane, session: Session | n
       {addField($, e, view)}
       {view.notice && <Text {...toneOf(view.notice.isError)}>{noticeTextOf(view.notice)}</Text>}
       {tabs($, e, view)}
-      {view.tab === 'setup' ? setupView($, e, view, session) : listView($, e, view, TAB_LISTS[view.tab])}
+      {view.tab === 'setup'
+        ? setupView($, e, view, session)
+        : view.tab === 'lyrics'
+          ? lyricsView($, e, view)
+          : listView($, e, view, TAB_LISTS[view.tab])}
     </Box>
   )
 }

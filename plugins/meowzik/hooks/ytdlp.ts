@@ -20,6 +20,7 @@ export type CookieState =
 type Attempt = { lines: string[]; stderr: string; code: number | null; usedCookies: boolean }
 
 const SECONDS = 1000
+const YOUTUBE_CLIENTS = ['--extractor-args', 'youtube:player_client=default,mweb']
 const COOKIE_PROBLEMS: Record<Exclude<CookieCheck, { isUsable: true }>['reason'], TextKey> = {
   noYoutube: 'cookiesNoYoutube',
   noSession: 'cookiesNoSession',
@@ -80,7 +81,9 @@ async function hasCookies($: EngineInterface, ytdlp: Ytdlp) {
 }
 
 async function attempt($: EngineInterface, ytdlp: Ytdlp, args: readonly string[], cookieArgs: string[], onLine?: (line: string) => void) {
-  const child = $.process.spawn({ argv: [ytdlp.path, ...ytdlp.runtime, ...cookieArgs, ...ytdlp.settings.ytdlpArgs, '--no-warnings', ...args] })
+  const child = $.process.spawn({
+    argv: [ytdlp.path, ...ytdlp.runtime, ...YOUTUBE_CLIENTS, ...cookieArgs, ...ytdlp.settings.ytdlpArgs, '--no-warnings', ...args],
+  })
   const lines: string[] = []
   const take = (line: string) => {
     lines.push(line)

@@ -47,7 +47,19 @@ const TEXT = {
   tabQueue: 'Queue ({count})',
   tabHistory: 'History ({count})',
   tabFavorites: 'Favorites ({count})',
+  tabLyrics: 'Lyrics',
   tabSetup: 'Setup',
+  lyricsIdle: 'Play a song to see its lyrics.',
+  lyricsLoading: 'Looking for the lyrics',
+  lyricsMissing: 'No lyrics found for this song.',
+  lyricsInstrumental: 'Instrumental',
+  lyricsUnreachable: 'Could not reach the lyrics service.',
+  lyricsRetry: 'Try again',
+  lyricsUnsynced: 'These lyrics are not synced to the song.',
+  lyricsHint: 'Press a line to jump to it.',
+  lyricsCredit: 'Lyrics from LRCLIB',
+  lyricsSubtitles: "Lyrics from the video's subtitles",
+  lyricsCaptions: "Lyrics from YouTube's automatic captions, which may be off",
   emptyQueue: 'The queue is empty.',
   emptyHistory: 'Nothing played yet.',
   emptyFavorites: 'No favorites yet: press {favorite} while a song plays.',
@@ -65,6 +77,13 @@ const TEXT = {
   clearQueue: 'Clear queue',
   clearHistory: 'Clear history',
 
+  setupPlayer: 'Player',
+  miniPlayerLabel: 'Mini player above the prompt',
+  miniPlayerPlaying: 'While music plays',
+  miniPlayerAlways: 'Always',
+  miniPlayerOff: 'Off',
+  statusLineLabel: 'Song in the status line',
+  miniTitle: '{note} {title}',
   setupTools: 'Tools',
   toolReady: '{tool} {version}',
   toolPath: '{path}',
@@ -152,6 +171,7 @@ export type Params = Record<string, string | number>
 type CountedKey = { [K in TextKey]: K extends `${infer Base}_other` ? Base : never }[TextKey]
 
 const PLURALS = new Intl.PluralRules('en')
+const ELLIPSIS = '…'
 
 export class Problem extends Error {
   constructor(
@@ -185,6 +205,12 @@ export const clockOf = (seconds: number) => {
   const rest = String(whole % 60).padStart(2, '0')
 
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`
+}
+
+export const clipped = (text: string, columns: number) => {
+  const characters = [...text]
+
+  return characters.length > columns ? `${characters.slice(0, Math.max(1, columns - 1)).join('')}${ELLIPSIS}` : text
 }
 
 export const lengthOf = (seconds: number) => (seconds > 0 ? clockOf(seconds) : say('unknownLength'))

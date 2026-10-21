@@ -20,6 +20,14 @@ const CURL = `${SYSTEM}\\System32\\curl.exe`
 const SONG_SECONDS = 3
 const TICK_MS = 250
 const BOT_CHECK = "ERROR: [youtube] abc: Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies"
+const LRCLIB = 'https://lrclib.net/api'
+
+const BAND = {
+  plugin: 'meowzik',
+  component: 'AbovePrompt',
+  requestId: 'band',
+  props: { hasSurvey: false, isWorking: false, maxRows: 6, bodyColumns: 100, scroll: { offset: 0, bodyRows: 6 }, view: {} },
+} as const
 
 const PANE = {
   plugin: 'meowzik',
@@ -43,6 +51,9 @@ type WorldOptions = {
   hasTools?: boolean
   isBotChecked?: boolean
   availableAt?: number
+  lyrics?: string
+  subtitles?: Record<string, string>
+  captions?: Record<string, string>
   files?: Record<string, string>
   store?: Record<string, unknown>
 }
@@ -70,9 +81,12 @@ const entryOf = (song: Song) =>
 
 const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
   const files = new Map<string, string>(Object.entries(options.files ?? {}))
+  const times = new Map<string, number>()
   const tools = new Set(options.hasTools === false ? [] : [MPV, YTDLP, NODE])
   const commands: string[][] = []
   const statuses: (string | undefined)[] = []
+  const opened: string[] = []
+  const fetched: string[] = []
 
   async function* fakeMpv(argv: readonly string[]): AsyncGenerator<ProcessSpawnChunk, ProcessSpawnResult> {
     const run = argv.find(arg => arg.startsWith('--script-opts='))?.match(/meowzik-run=(\d+)/)?.[1]
@@ -101,6 +115,15 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
 
   async function* fakeYtdlp(argv: readonly string[]): AsyncGenerator<ProcessSpawnChunk, ProcessSpawnResult> {
     const target = argv.at(-1) ?? ''
+    if (argv.includes('--write-subs') || argv.includes('--write-auto-subs')) {
+      const written = argv.includes('--write-subs') ? options.subtitles : options.captions
+      for (const [language, json3] of Object.entries(written ?? {})) {
+        files.set(`${DATA}\\run\\subs.${language}.json3`, json3)
+        times.set(`${DATA}\\run\\subs.${language}.json3`, clock.now())
+      }
+      yield line('en')
+      return { code: 0, signal: null }
+    }
     if (argv.includes('-f')) {
       if (options.isBotChecked) {
         yield { stream: 'stderr', text: BOT_CHECK }
@@ -130,11 +153,29 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('tool.register', (_, e) => ({ value: { tool: `mcp__meowzik__${e.name}` } }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.open', (_, e) => (opened.push(e.id), { value: { isPlaced: true } }))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
   on('ui.status', (_, e) => (statuses.push(e.text), { value: undefined }))
   on('fs.exists', (_, e) => ({ value: files.has(keyOf(e.path)) }))
   on('fs.write', (_, e) => (files.set(keyOf(e.path), e.text), { value: undefined }))
   on('fs.stat', (_, e) => ({ value: { kind: 'file', size: (files.get(keyOf(e.path)) ?? '').length, mtimeMs: 0, isLink: false } }))
+  on('fs.list', (_, e) => {
+    const folder = `${keyOf(e.path)}\\`
+    const names = [...files.keys()].filter(path => path.startsWith(folder) && !path.slice(folder.length).includes('\\'))
+
+    return {
+      value: names.map(path => ({
+        name: path.slice(folder.length),
+        kind: 'file' as const,
+        size: (files.get(path) ?? '').length,
+        mtimeMs: times.get(path) ?? 0,
+        isLink: false,
+      })),
+    }
+  })
   on('fs.read', (_, e) => {
     const text = e.path.endsWith(LOGO) ? 'logo' : files.get(keyOf(e.path))
     if (text === undefined) {
@@ -142,16 +183,24 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
     }
     return { value: e.as === 'bytes' ? { base64: btoa(text) } : text }
   })
-  on('http.fetch', (_, e) => ({
-    value: {
-      status: 200,
-      ok: true,
-      headers: {},
-      text: e.url.includes('api.github.com')
-        ? JSON.stringify({ assets: [{ name: 'mpv-x86_64-20261021-git-e471496c56.7z', browser_download_url: 'https://example.com/mpv.7z' }] })
-        : '',
-    },
-  }))
+  on('http.fetch', (_, e) => {
+    fetched.push(e.url)
+    if (e.url.startsWith(LRCLIB)) {
+      const isFound = options.lyrics !== undefined && e.url.startsWith(`${LRCLIB}/get`)
+      return { value: { status: isFound ? 200 : 404, ok: isFound, headers: {}, text: isFound ? JSON.stringify({ syncedLyrics: options.lyrics }) : '' } }
+    }
+
+    return {
+      value: {
+        status: 200,
+        ok: true,
+        headers: {},
+        text: e.url.includes('api.github.com')
+          ? JSON.stringify({ assets: [{ name: 'mpv-x86_64-20261021-git-e471496c56.7z', browser_download_url: 'https://example.com/mpv.7z' }] })
+          : '',
+      },
+    }
+  })
   on('process.run', (_, e) => {
     const argv = [...e.argv]
     commands.push(argv)
@@ -185,7 +234,7 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
     return { value: yield* e.argv[0] === MPV ? fakeMpv(e.argv) : fakeYtdlp(e.argv) }
   })
 
-  return { files, commands, statuses, control: () => JSON.parse(files.get(CONTROL) ?? '{}') as Record<string, unknown> }
+  return { files, commands, statuses, opened, fetched, control: () => JSON.parse(files.get(CONTROL) ?? '{}') as Record<string, unknown> }
 }
 
 const start = async <S extends Surface>($: Engine, surface: S) => {
@@ -408,6 +457,94 @@ test('the sliders seek by dragging and set the volume live, and the arrows step 
   expect(machine.control()).toMatchObject({ volume: 95 })
   expect(await ui.find({ type: 'Text', text: '95%', in: 'volume' })).toBeDefined()
 
+  await ui.unmount()
+})
+
+test('the mini player above the prompt plays, opens the pane and follows its setting', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock)
+  const pane = await start($, 'desktop')
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  expect(await band.find({ key: 'mini:pause' })).toBeUndefined()
+
+  await pane.input({ key: 'add', text: 'daft punk' })
+  expect(await labelOf(band, 'mini:open')).toBe(`${ICONS.note} One More Time`)
+  expect(await sliderOf(band, 'miniSeekbar')).toMatchObject({ mode: 'seek', layout: 'inline' })
+
+  await band.press({ key: 'mini:pause' })
+  expect(machine.control()).toMatchObject({ pause: true })
+  await band.press({ key: 'mini:open' })
+  expect(machine.opened.at(-1)).toBe('meowzik')
+
+  await pane.press({ key: 'tab:setup' })
+  await pane.select({ key: 'miniPlayer', value: 'off' })
+  expect(await band.find({ key: 'mini:pause' })).toBeUndefined()
+  await pane.select({ key: 'statusLine', value: 'off' })
+  expect(machine.statuses.at(-1)).toBeUndefined()
+
+  await pane.press({ key: 'stop' })
+  await pane.select({ key: 'miniPlayer', value: 'always' })
+  expect(await labelOf(band, 'mini:open')).toBe(`${ICONS.note} Meowzik`)
+
+  await band.unmount()
+  await pane.unmount()
+})
+
+test('the lyrics tab follows the song and a line jumps to it', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock, { lyrics: '[00:00.50] First line\n[00:01.50] Second line\n[00:02.50] Third line' })
+  const ui = await start($, 'desktop')
+
+  await ui.input({ key: 'add', text: 'daft punk' })
+  await ui.press({ key: 'tab:lyrics' })
+  expect(machine.fetched.some(url => url.startsWith(`${LRCLIB}/get?`) && url.includes('track_name=One+More+Time'))).toBe(true)
+
+  await clock.advance(2250)
+  const now = (await ui.findAll({ type: 'Text' })).find(found => found.text === 'Second line')
+  expect(now?.props).toMatchObject({ weight: 'bold' })
+
+  await ui.press({ key: 'lyric:0' })
+  expect(machine.control()).toMatchObject({ seek: { to: 0.5 } })
+
+  await ui.unmount()
+})
+
+test('a song without lyrics says so', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  world(on, clock)
+  const ui = await start($, 'desktop')
+
+  await ui.press({ key: 'tab:lyrics' })
+  expect(await texts(ui)).toContain('Play a song to see its lyrics.')
+  await ui.input({ key: 'add', text: 'daft punk' })
+  expect(await texts(ui)).toContain('No lyrics found for this song.')
+
+  await ui.unmount()
+})
+
+test("without LRCLIB lyrics the video's subtitles stand in, then its automatic captions", async ($, on) => {
+  const subtitle = (text: string) => JSON.stringify({ events: [{ tStartMs: 500, segs: [{ utf8: text }] }] })
+  const clock = mock.clock(on, { now: 0 })
+  world(on, clock, { subtitles: { en: subtitle('One more time'), de: subtitle('Noch einmal') } })
+  const ui = await start($, 'desktop')
+
+  await ui.press({ key: 'tab:lyrics' })
+  await ui.input({ key: 'add', text: 'daft punk' })
+  expect(await texts(ui)).toContain('One more time')
+  expect(await texts(ui)).toContain("Lyrics from the video's subtitles")
+  await ui.unmount()
+})
+
+test('automatic captions are the last resort, and say they may be off', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  world(on, clock, { captions: { 'en-orig': JSON.stringify({ events: [{ tStartMs: 500, segs: [{ utf8: 'one more time' }] }] }) } })
+  const ui = await start($, 'desktop')
+
+  await ui.press({ key: 'tab:lyrics' })
+  await ui.input({ key: 'add', text: 'daft punk' })
+  expect(await texts(ui)).toContain('one more time')
+  expect(await texts(ui)).toContain("Lyrics from YouTube's automatic captions, which may be off")
   await ui.unmount()
 })
 

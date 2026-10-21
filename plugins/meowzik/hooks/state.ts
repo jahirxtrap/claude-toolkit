@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginState } from 'claude-code'
 
-import type { Cover, LoopMode, Notice, Phase, Setup, Tab, Track } from '../types'
+import type { Cover, LoopMode, Lyrics, MiniPlayer, Notice, Phase, Setup, Tab, Track } from '../types'
 import type { Params, TextKey } from './text'
 
 export type Values = PluginState['meowzik']
@@ -22,6 +22,8 @@ const loop = atom({ plugin: 'meowzik', key: 'loop' } as const, 'off' as LoopMode
 const isShuffled = atom({ plugin: 'meowzik', key: 'isShuffled' } as const, false)
 const isAutoplay = atom({ plugin: 'meowzik', key: 'isAutoplay' } as const, false)
 const volume = atom({ plugin: 'meowzik', key: 'volume' } as const, DEFAULT_VOLUME)
+const miniPlayer = atom({ plugin: 'meowzik', key: 'miniPlayer' } as const, 'playing' as MiniPlayer)
+const showsStatus = atom({ plugin: 'meowzik', key: 'showsStatus' } as const, true)
 const tab = atom({ plugin: 'meowzik', key: 'tab' } as const, 'queue' as Tab)
 const page = atom({ plugin: 'meowzik', key: 'page' } as const, 0)
 const notice = atom({ plugin: 'meowzik', key: 'notice' } as const, null as Notice | null)
@@ -43,6 +45,7 @@ const setup = atom(
   } as Setup,
 )
 const cover = atom({ plugin: 'meowzik', key: 'cover' } as const, null as Cover | null)
+const lyrics = atom({ plugin: 'meowzik', key: 'lyrics' } as const, null as Lyrics | null)
 
 type Change<K extends Key> = (value: Values[K]) => Values[K]
 
@@ -70,6 +73,10 @@ export async function get<K extends Key>($: EngineInterface, key: K): Promise<Va
       return (await read($, isAutoplay)) as Values[K]
     case 'volume':
       return (await read($, volume)) as Values[K]
+    case 'miniPlayer':
+      return (await read($, miniPlayer)) as Values[K]
+    case 'showsStatus':
+      return (await read($, showsStatus)) as Values[K]
     case 'tab':
       return (await read($, tab)) as Values[K]
     case 'page':
@@ -80,6 +87,8 @@ export async function get<K extends Key>($: EngineInterface, key: K): Promise<Va
       return (await read($, isSearching)) as Values[K]
     case 'setup':
       return (await read($, setup)) as Values[K]
+    case 'lyrics':
+      return (await read($, lyrics)) as Values[K]
     default:
       return (await read($, cover)) as Values[K]
   }
@@ -111,6 +120,10 @@ export async function put<K extends Key>($: EngineInterface, key: K, change: Cha
       return (await update($, isAutoplay, apply)) as Values[K]
     case 'volume':
       return (await update($, volume, apply)) as Values[K]
+    case 'miniPlayer':
+      return (await update($, miniPlayer, apply)) as Values[K]
+    case 'showsStatus':
+      return (await update($, showsStatus, apply)) as Values[K]
     case 'tab':
       return (await update($, tab, apply)) as Values[K]
     case 'page':
@@ -121,6 +134,8 @@ export async function put<K extends Key>($: EngineInterface, key: K, change: Cha
       return (await update($, isSearching, apply)) as Values[K]
     case 'setup':
       return (await update($, setup, apply)) as Values[K]
+    case 'lyrics':
+      return (await update($, lyrics, apply)) as Values[K]
     default:
       return (await update($, cover, apply)) as Values[K]
   }
@@ -143,12 +158,15 @@ export async function snapshot($: EngineInterface): Promise<Values> {
     shownShuffle,
     shownAutoplay,
     shownVolume,
+    shownMiniPlayer,
+    shownStatus,
     shownTab,
     shownPage,
     shownNotice,
     shownSearching,
     shownSetup,
     shownCover,
+    shownLyrics,
   ] = await Promise.all([
     read($, current),
     read($, phase),
@@ -161,12 +179,15 @@ export async function snapshot($: EngineInterface): Promise<Values> {
     read($, isShuffled),
     read($, isAutoplay),
     read($, volume),
+    read($, miniPlayer),
+    read($, showsStatus),
     read($, tab),
     read($, page),
     read($, notice),
     read($, isSearching),
     read($, setup),
     read($, cover),
+    read($, lyrics),
   ])
 
   return {
@@ -181,12 +202,15 @@ export async function snapshot($: EngineInterface): Promise<Values> {
     isShuffled: shownShuffle,
     isAutoplay: shownAutoplay,
     volume: shownVolume,
+    miniPlayer: shownMiniPlayer,
+    showsStatus: shownStatus,
     tab: shownTab,
     page: shownPage,
     notice: shownNotice,
     isSearching: shownSearching,
     setup: shownSetup,
     cover: shownCover,
+    lyrics: shownLyrics,
   }
 }
 

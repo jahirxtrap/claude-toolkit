@@ -20,7 +20,21 @@ export type LoopMode = 'off' | 'track' | 'queue'
 
 export type Phase = 'idle' | 'loading' | 'playing' | 'paused'
 
-export type Tab = 'queue' | 'history' | 'favorites' | 'setup'
+export type Tab = 'queue' | 'history' | 'favorites' | 'lyrics' | 'setup'
+
+export type LyricLine = { at: number; text: string }
+
+export type LyricsSource = 'lrclib' | 'subtitles' | 'captions'
+
+export type Lyrics = {
+  trackId: string
+  status: 'loading' | 'found' | 'instrumental' | 'missing' | 'unreachable'
+  isSynced: boolean
+  lines: LyricLine[]
+  source: LyricsSource | null
+}
+
+export type MiniPlayer = 'playing' | 'always' | 'off'
 
 export type Notice = { key: string; params: Record<string, string>; isError: boolean }
 
@@ -56,12 +70,15 @@ declare module 'claude-code' {
       isShuffled: boolean
       isAutoplay: boolean
       volume: number
+      miniPlayer: MiniPlayer
+      showsStatus: boolean
       tab: Tab
       page: number
       notice: Notice | null
       isSearching: boolean
       setup: Setup
       cover: Cover | null
+      lyrics: Lyrics | null
     }
   }
 }

@@ -1,10 +1,21 @@
 import type { EngineInterface, Timer } from 'claude-code'
 
-import type { LoopMode, Requester, Track } from '../types'
+import type { LoopMode, Lyrics, MiniPlayer, Requester, Track } from '../types'
 import { findTracks, relatedTo, resolvedTrack, searchTracks, streamFor } from './catalog'
+import { joined } from './config'
 import type { Session } from './config'
 import { coverOf } from './cover'
 import { VOLUME_MAX } from './layout'
+import {
+  captionLanguagesOf,
+  emptyLyrics,
+  lyricsFor,
+  MANUAL_LANGUAGES,
+  SUBTITLE_NAME,
+  subtitleChoiceOf,
+  subtitleLinesOf,
+  subtitleLyricsOf,
+} from './lyrics'
 import { playerArgv, readReports } from './mpv'
 import type { Control } from './mpv'
 import {
@@ -26,6 +37,7 @@ import type { ListName } from './shelf'
 import { get, put, set, tell } from './state'
 import { clockOf, countKey, LOOP_NAMES, Problem, problemText, say, switchOf, titleOf } from './text'
 import type { Params, TextKey } from './text'
+import { ytdlpLines } from './ytdlp'
 import type { Ytdlp } from './ytdlp'
 
 export type Placement = 'end' | 'next' | 'now'
@@ -41,12 +53,16 @@ const BACKOFF_MS = 2000
 const PROGRESS_STEP = 25
 const MS_PER_SECOND = 1000
 const AVAILABLE_MARGIN_MS = 500
+const FRESH_MARGIN_MS = 2000
+const UNKNOWN_LANGUAGE = 'NA'
 const FATAL: ReadonlySet<TextKey> = new Set<TextKey>(['botCheck', 'botCheckCookies', 'installFailed', 'manualMpv', 'playerMissing', 'homeMissing'])
 const CURRENT_KEY = 'current'
 const LOOP_KEY = 'loop'
 const SHUFFLE_KEY = 'isShuffled'
 const AUTOPLAY_KEY = 'isAutoplay'
 const VOLUME_KEY = 'volume'
+const MINI_PLAYER_KEY = 'miniPlayer'
+const STATUS_KEY = 'showsStatus'
 
 let session: Session | null = null
 let run = 0
@@ -102,6 +118,8 @@ const isLoopMode = (value: unknown): value is LoopMode => value === 'off' || val
 
 const isLevel = (value: unknown): value is number => typeof value === 'number' && value >= 0 && value <= VOLUME_MAX
 
+const isMiniPlayer = (value: unknown): value is MiniPlayer => value === 'playing' || value === 'always' || value === 'off'
+
 const isStoredTrack = (value: unknown): value is Track =>
   typeof value === 'object' && value !== null && typeof (value as Track).id === 'string' && typeof (value as Track).url === 'string'
 
@@ -137,9 +155,9 @@ async function writeControl($: EngineInterface) {
 }
 
 async function showStatus($: EngineInterface) {
-  const [track, shown] = await Promise.all([get($, 'current'), get($, 'phase')])
+  const [track, shown, isShown] = await Promise.all([get($, 'current'), get($, 'phase'), get($, 'showsStatus')])
 
-  if (!track || shown === 'idle') {
+  if (!track || shown === 'idle' || !isShown) {
     $.ui.status(undefined)
     return
   }
@@ -178,6 +196,59 @@ async function refreshCover($: EngineInterface, mpv: string, track: Track, mine:
   const made = await coverOf($, mpv, sessionOf().places, track, mine)
   if (mine === run) {
     await set($, 'cover', made)
+  }
+}
+
+async function subtitlesOf($: EngineInterface, track: Track): Promise<Lyrics | null> {
+  if (track.source !== 'youtube') {
+    return null
+  }
+
+  const { ytdlp } = await toolsFor($)
+  const { places } = sessionOf()
+  let language = ''
+
+  for (const isAuto of [false, true]) {
+    const startedAt = await $.clock.now()
+    const printed = await ytdlpLines($, ytdlp, [
+      '--no-playlist',
+      '--skip-download',
+      '--no-simulate',
+      isAuto ? '--write-auto-subs' : '--write-subs',
+      '--sub-format',
+      'json3',
+      '--sub-langs',
+      isAuto ? captionLanguagesOf(language) : MANUAL_LANGUAGES,
+      '-o',
+      joined(places.platform, places.run, SUBTITLE_NAME),
+      '--print',
+      '%(language)s',
+      track.url,
+    ]).catch((): string[] => [])
+    const spoken = printed[0] ?? ''
+    language ||= spoken === UNKNOWN_LANGUAGE ? '' : spoken
+
+    const fresh = (await $.fs.list(places.run)).filter(entry => entry.mtimeMs >= startedAt - FRESH_MARGIN_MS).map(entry => entry.name)
+    const chosen = subtitleChoiceOf(fresh, language)
+    const lyrics = chosen
+      ? subtitleLyricsOf(track.id, subtitleLinesOf(await $.fs.read(joined(places.platform, places.run, chosen))), isAuto ? 'captions' : 'subtitles')
+      : null
+    if (lyrics) {
+      return lyrics
+    }
+  }
+
+  return null
+}
+
+export async function refreshLyrics($: EngineInterface, track: Track) {
+  await set($, 'lyrics', emptyLyrics(track.id, 'loading'))
+  const found = await lyricsFor($, track).catch(() => emptyLyrics(track.id, 'unreachable'))
+  const isMissing = found.status === 'missing' || found.status === 'unreachable'
+  const shown = isMissing ? ((await subtitlesOf($, track).catch(() => null)) ?? found) : found
+
+  if ((await get($, 'current'))?.id === track.id) {
+    await set($, 'lyrics', shown)
   }
 }
 
@@ -271,6 +342,7 @@ async function play($: EngineInterface, track: Track, mine: number, startAt: num
     }
 
     detach(refreshCover($, mpv, ready, mine))
+    detach(refreshLyrics($, ready))
     const stream = await streamFor($, ytdlp, ready)
     if (stream.availableAt !== null) {
       await waitUntil($, stream.availableAt * MS_PER_SECOND + AVAILABLE_MARGIN_MS)
@@ -564,6 +636,17 @@ export async function toggleAutoplay($: EngineInterface) {
   return replyOf('autoplayIs', { state: switchOf(isOn) })
 }
 
+export async function setMiniPlayer($: EngineInterface, shown: MiniPlayer) {
+  await set($, 'miniPlayer', shown)
+  await $.store.set(MINI_PLAYER_KEY, shown)
+}
+
+export async function setShowsStatus($: EngineInterface, isShown: boolean) {
+  await set($, 'showsStatus', isShown)
+  await $.store.set(STATUS_KEY, isShown)
+  await showStatus($)
+}
+
 export async function setVolume($: EngineInterface, level: number) {
   const next = await set($, 'volume', Math.round(Math.min(VOLUME_MAX, Math.max(0, level))))
   await $.store.set(VOLUME_KEY, next)
@@ -708,12 +791,14 @@ export async function restore($: EngineInterface, active: Session) {
     loadList($, active.places, 'played'),
     loadList($, active.places, 'favorites'),
   ])
-  const [mode, isRandom, isAuto, level, saved] = await Promise.all([
+  const [mode, isRandom, isAuto, level, saved, mini, isStatusShown] = await Promise.all([
     storedOf($, LOOP_KEY, isLoopMode),
     storedOf($, SHUFFLE_KEY, isBoolean),
     storedOf($, AUTOPLAY_KEY, isBoolean),
     storedOf($, VOLUME_KEY, isLevel),
     storedOf($, CURRENT_KEY, isStoredTrack),
+    storedOf($, MINI_PLAYER_KEY, isMiniPlayer),
+    storedOf($, STATUS_KEY, isBoolean),
   ])
 
   await set($, 'favorites', liked)
@@ -722,6 +807,8 @@ export async function restore($: EngineInterface, active: Session) {
   await put($, 'isShuffled', now => isRandom ?? now)
   await put($, 'isAutoplay', now => isAuto ?? now)
   await put($, 'volume', now => level ?? now)
+  await put($, 'miniPlayer', now => mini ?? now)
+  await put($, 'showsStatus', now => isStatusShown ?? now)
 
   const [now, shown, at] = await Promise.all([get($, 'current'), get($, 'phase'), get($, 'position')])
   if (now && shown !== 'idle') {

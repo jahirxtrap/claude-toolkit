@@ -27,6 +27,7 @@ export type Places = {
   deno: string
   tar: string
   curl: string
+  run: string
   control: string
   cookieJar: string
   coverPng: string
@@ -82,6 +83,7 @@ export const placesFor = (platform: Platform, arch: string, configFolder: string
     deno: at(data, 'bin', 'deno', `deno${exe}`),
     tar: system('tar'),
     curl: system('curl'),
+    run: at(data, 'run'),
     control: at(data, 'run', 'control.json'),
     cookieJar: at(data, 'cookies.txt'),
     coverPng: at(data, 'run', 'cover.png'),
