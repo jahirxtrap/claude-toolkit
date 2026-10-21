@@ -126,6 +126,9 @@ test('settings and places come from the options and the machine', () => {
     ytdlpArgs: [],
   })
   expect(settingsOf({ searchSource: 'bandcamp' }).searchSource).toBe('youtube')
+  expect(settingsOf({})).toMatchObject({ miniPlayer: 'playing', showsStatus: true })
+  expect(settingsOf({ miniPlayer: 'always', statusLine: false })).toMatchObject({ miniPlayer: 'always', showsStatus: false })
+  expect(settingsOf({ miniPlayer: 'sometimes' }).miniPlayer).toBe('playing')
   expect(joined('windows', 'C:\\Users\\me\\', '.claude', 'meowzik')).toBe('C:\\Users\\me\\.claude\\meowzik')
 
   const windows = placesFor('windows', 'amd64', 'C:\\Users\\me\\.claude', 'C:\\plugins\\meowzik', 'C:\\WINDOWS')

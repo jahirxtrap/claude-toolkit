@@ -70,8 +70,6 @@ declare module 'claude-code' {
       isShuffled: boolean
       isAutoplay: boolean
       volume: number
-      miniPlayer: MiniPlayer
-      showsStatus: boolean
       tab: Tab
       page: number
       notice: Notice | null

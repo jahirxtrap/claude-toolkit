@@ -91,7 +91,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, ($, e) => drawPane($, e, session))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const band = await drawBand($, e)
+    const band = await drawBand($, e, settings.miniPlayer)
     if (!band) {
       return next(e)
     }

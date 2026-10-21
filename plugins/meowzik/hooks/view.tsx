@@ -41,8 +41,6 @@ import {
   removeFrom,
   seekBy,
   seekTo,
-  setMiniPlayer,
-  setShowsStatus,
   skip,
   stop,
   toggleAutoplay,
@@ -68,12 +66,7 @@ type Pane = RenderInput<'Pane'>
 
 type Band = RenderInput<'AbovePrompt'>
 
-type Choice = { value: string; label: string }
-
-const MINI_PLAYERS: Record<MiniPlayer, TextKey> = { playing: 'miniPlayerPlaying', always: 'miniPlayerAlways', off: 'miniPlayerOff' }
 const LYRICS_CREDITS: Record<LyricsSource, TextKey> = { lrclib: 'lyricsCredit', subtitles: 'lyricsSubtitles', captions: 'lyricsCaptions' }
-const SWITCH_ON = 'on'
-const SWITCH_OFF = 'off'
 
 const REQUESTERS: Record<Track['requestedBy'], TextKey> = { you: 'requesterYou', claude: 'requesterClaude', autoplay: 'requesterAutoplay' }
 const HEADINGS: Record<Exclude<Phase, 'idle'>, TextKey> = { playing: 'nowPlaying', paused: 'paused', loading: 'loading' }
@@ -418,54 +411,6 @@ function toolRows($: EngineInterface, e: Pane, tools: Setup) {
   )
 }
 
-function choice($: EngineInterface, e: Pane, key: string, label: string, options: readonly Choice[], value: string, onPick: (value: string) => void) {
-  if (e.surface === 'mobile') {
-    const { Box, Button, Text } = $.ui.resolve(e)
-
-    return (
-      <Box columnGap={GAP} rowGap={GAP} flexWrap="wrap" alignItems="center">
-        <Text dimColor>{label}</Text>
-        {options.map(option => (
-          <Button
-            key={`${key}:${option.value}`}
-            variant={variantOf(option.value === value)}
-            label={option.label}
-            onPress={() => onPick(option.value)}
-          />
-        ))}
-      </Box>
-    )
-  }
-
-  const { Select } = $.ui.resolve(e)
-
-  return <Select key={key} label={label} options={options} value={value} onSelect={picked => onPick(picked)} />
-}
-
-function playerSettings($: EngineInterface, e: Pane, view: Values) {
-  const { Box, Text } = $.ui.resolve(e)
-  const players = (Object.keys(MINI_PLAYERS) as MiniPlayer[]).map(player => ({ value: player, label: say(MINI_PLAYERS[player]) }))
-  const switches = [
-    { value: SWITCH_ON, label: say('modeOn') },
-    { value: SWITCH_OFF, label: say('modeOff') },
-  ]
-
-  return (
-    <Box flexDirection="column" rowGap={GAP}>
-      <Text weight="bold">{say('setupPlayer')}</Text>
-      {choice($, e, 'miniPlayer', say('miniPlayerLabel'), players, view.miniPlayer, picked => {
-        const player = (Object.keys(MINI_PLAYERS) as MiniPlayer[]).find(option => option === picked)
-        if (player) {
-          void setMiniPlayer($, player)
-        }
-      })}
-      {choice($, e, 'statusLine', say('statusLineLabel'), switches, view.showsStatus ? SWITCH_ON : SWITCH_OFF, picked =>
-        void setShowsStatus($, picked === SWITCH_ON),
-      )}
-    </Box>
-  )
-}
-
 function setupView($: EngineInterface, e: Pane, view: Values, session: Session | null) {
   const { Box, Button, Text } = $.ui.resolve(e)
   const tools = view.setup
@@ -473,7 +418,6 @@ function setupView($: EngineInterface, e: Pane, view: Values, session: Session |
 
   return (
     <Box flexDirection="column" rowGap={GAP}>
-      {playerSettings($, e, view)}
       <Text weight="bold">{say('setupTools')}</Text>
       {toolRows($, e, tools)}
       {isMissing && <Text dimColor>{tools.canBrew ? say('installBrew') : say('installWhere', { folder: tools.folder })}</Text>}
@@ -580,14 +524,14 @@ function miniSeek($: EngineInterface, e: Band, view: Values, columns: number) {
   )
 }
 
-export async function drawBand($: EngineInterface, e: Band) {
-  if (e.props.hasSurvey) {
+export async function drawBand($: EngineInterface, e: Band, miniPlayer: MiniPlayer) {
+  if (e.props.hasSurvey || miniPlayer === 'off') {
     return null
   }
 
   const view = await snapshot($)
   const isActive = view.current !== null || view.phase !== 'idle'
-  if (view.miniPlayer === 'off' || (view.miniPlayer === 'playing' && !isActive)) {
+  if (miniPlayer === 'playing' && !isActive) {
     return null
   }
 

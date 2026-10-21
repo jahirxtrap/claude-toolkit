@@ -460,7 +460,7 @@ test('the sliders seek by dragging and set the volume live, and the arrows step 
   await ui.unmount()
 })
 
-test('the mini player above the prompt plays, opens the pane and follows its setting', async ($, on) => {
+test('the mini player above the prompt shows while music plays and opens the pane', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   const machine = world(on, clock)
   const pane = await start($, 'desktop')
@@ -477,15 +477,36 @@ test('the mini player above the prompt plays, opens the pane and follows its set
   await band.press({ key: 'mini:open' })
   expect(machine.opened.at(-1)).toBe('meowzik')
 
-  await pane.press({ key: 'tab:setup' })
-  await pane.select({ key: 'miniPlayer', value: 'off' })
+  await band.press({ key: 'mini:stop' })
   expect(await band.find({ key: 'mini:pause' })).toBeUndefined()
-  await pane.select({ key: 'statusLine', value: 'off' })
-  expect(machine.statuses.at(-1)).toBeUndefined()
+  expect(await pane.find({ key: 'miniPlayer' })).toBeUndefined()
 
-  await pane.press({ key: 'stop' })
-  await pane.select({ key: 'miniPlayer', value: 'always' })
+  await band.unmount()
+  await pane.unmount()
+})
+
+test('the mini player and the status line turn off from the settings', { options: { miniPlayer: 'off', statusLine: false } }, async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock)
+  const pane = await start($, 'desktop')
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await pane.input({ key: 'add', text: 'daft punk' })
+  expect(await band.find({ key: 'mini:pause' })).toBeUndefined()
+  expect(machine.statuses.filter(status => status !== undefined)).toEqual([])
+
+  await band.unmount()
+  await pane.unmount()
+})
+
+test('the mini player can stay above the prompt with nothing playing', { options: { miniPlayer: 'always' } }, async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  world(on, clock)
+  const pane = await start($, 'desktop')
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
   expect(await labelOf(band, 'mini:open')).toBe(`${ICONS.note} Meowzik`)
+  expect(await band.find({ key: 'miniSeekbar' })).toBeUndefined()
 
   await band.unmount()
   await pane.unmount()

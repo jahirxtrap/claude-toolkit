@@ -36,7 +36,7 @@ See [`plugins/chess`](plugins/chess) for the code and its tests.
 
 - **Any source:** a song name (searched on YouTube, or SoundCloud if you pick it), a YouTube or SoundCloud link, a whole YouTube playlist or SoundCloud set, a Spotify track, album or playlist (each song is looked up when it plays), or a Suno song.
 - **Player controls:** the bot's buttons as a player's, with icons (⏮ ▶ ⏭ ⏹, then shuffle, loop for the queue or the track, autoplay and favorite, lit while on), a thick progress bar you drag to seek and a volume slider you drag or move with the arrows.
-- **Mini player:** a one-row player above the prompt (back, play or pause, skip, stop, the song and its progress bar); the song opens the pane. Show it while music plays, always or never, and keep or hide the song in the status line, from the pane's Setup tab.
+- **Mini player:** a one-row player above the prompt (back, play or pause, skip, stop, the song and its progress bar); the song opens the pane. Show it while music plays, always or never, and keep or hide the song in the status line, in `/config`.
 - **Lyrics:** a Lyrics tab with the song's lyrics from [LRCLIB](https://lrclib.net), synced lines lit as they are sung; press a line to jump to it. When LRCLIB has none, a YouTube song uses the video's own subtitles, then its automatic captions.
 - **Autoplay:** when the queue runs out it follows YouTube's mix or SoundCloud's recommendations for what you were listening to, skipping what already played in the session.
 - **Lists without limits:** Queue, History and Favorites in tabs, page by page; press a song to play it now, queue it, move it, remove it or favorite it. They are kept in `~/.claude/meowzik/lists`, so they survive the session.
@@ -45,7 +45,7 @@ See [`plugins/chess`](plugins/chess) for the code and its tests.
 - **YouTube's bot check:** when YouTube asks to confirm you are not a bot, point the mod at a cookies file (or a browser) in `/config`; like the bot it works on a copy and keeps the session YouTube rotates. Or switch the search source to SoundCloud, which needs no login.
 - **Every surface:** the cover, the draggable progress and volume sliders and the field to add songs in the terminal and the desktop app; the field with seek and volume buttons in VS Code; the player, the lists and Claude's tools in the phone app.
 
-Settings (in `/config`, under meowzik): the search source, the YouTube cookies file or browser, extra yt-dlp arguments, and the mpv and yt-dlp paths if you want your own.
+Settings (in `/config`, under meowzik): the mini player, the song in the status line, the search source, the YouTube cookies file or browser, extra yt-dlp arguments, and the mpv and yt-dlp paths if you want your own.
 
 See [`plugins/meowzik`](plugins/meowzik) for the code and its tests.
 

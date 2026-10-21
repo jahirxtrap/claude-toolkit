@@ -1,6 +1,6 @@
 import type { EngineInterface, Timer } from 'claude-code'
 
-import type { LoopMode, Lyrics, MiniPlayer, Requester, Track } from '../types'
+import type { LoopMode, Lyrics, Requester, Track } from '../types'
 import { findTracks, relatedTo, resolvedTrack, searchTracks, streamFor } from './catalog'
 import { joined } from './config'
 import type { Session } from './config'
@@ -61,8 +61,6 @@ const LOOP_KEY = 'loop'
 const SHUFFLE_KEY = 'isShuffled'
 const AUTOPLAY_KEY = 'isAutoplay'
 const VOLUME_KEY = 'volume'
-const MINI_PLAYER_KEY = 'miniPlayer'
-const STATUS_KEY = 'showsStatus'
 
 let session: Session | null = null
 let run = 0
@@ -118,7 +116,6 @@ const isLoopMode = (value: unknown): value is LoopMode => value === 'off' || val
 
 const isLevel = (value: unknown): value is number => typeof value === 'number' && value >= 0 && value <= VOLUME_MAX
 
-const isMiniPlayer = (value: unknown): value is MiniPlayer => value === 'playing' || value === 'always' || value === 'off'
 
 const isStoredTrack = (value: unknown): value is Track =>
   typeof value === 'object' && value !== null && typeof (value as Track).id === 'string' && typeof (value as Track).url === 'string'
@@ -155,9 +152,9 @@ async function writeControl($: EngineInterface) {
 }
 
 async function showStatus($: EngineInterface) {
-  const [track, shown, isShown] = await Promise.all([get($, 'current'), get($, 'phase'), get($, 'showsStatus')])
+  const [track, shown] = await Promise.all([get($, 'current'), get($, 'phase')])
 
-  if (!track || shown === 'idle' || !isShown) {
+  if (!track || shown === 'idle' || !session?.settings.showsStatus) {
     $.ui.status(undefined)
     return
   }
@@ -636,17 +633,6 @@ export async function toggleAutoplay($: EngineInterface) {
   return replyOf('autoplayIs', { state: switchOf(isOn) })
 }
 
-export async function setMiniPlayer($: EngineInterface, shown: MiniPlayer) {
-  await set($, 'miniPlayer', shown)
-  await $.store.set(MINI_PLAYER_KEY, shown)
-}
-
-export async function setShowsStatus($: EngineInterface, isShown: boolean) {
-  await set($, 'showsStatus', isShown)
-  await $.store.set(STATUS_KEY, isShown)
-  await showStatus($)
-}
-
 export async function setVolume($: EngineInterface, level: number) {
   const next = await set($, 'volume', Math.round(Math.min(VOLUME_MAX, Math.max(0, level))))
   await $.store.set(VOLUME_KEY, next)
@@ -791,14 +777,12 @@ export async function restore($: EngineInterface, active: Session) {
     loadList($, active.places, 'played'),
     loadList($, active.places, 'favorites'),
   ])
-  const [mode, isRandom, isAuto, level, saved, mini, isStatusShown] = await Promise.all([
+  const [mode, isRandom, isAuto, level, saved] = await Promise.all([
     storedOf($, LOOP_KEY, isLoopMode),
     storedOf($, SHUFFLE_KEY, isBoolean),
     storedOf($, AUTOPLAY_KEY, isBoolean),
     storedOf($, VOLUME_KEY, isLevel),
     storedOf($, CURRENT_KEY, isStoredTrack),
-    storedOf($, MINI_PLAYER_KEY, isMiniPlayer),
-    storedOf($, STATUS_KEY, isBoolean),
   ])
 
   await set($, 'favorites', liked)
@@ -807,8 +791,6 @@ export async function restore($: EngineInterface, active: Session) {
   await put($, 'isShuffled', now => isRandom ?? now)
   await put($, 'isAutoplay', now => isAuto ?? now)
   await put($, 'volume', now => level ?? now)
-  await put($, 'miniPlayer', now => mini ?? now)
-  await put($, 'showsStatus', now => isStatusShown ?? now)
 
   const [now, shown, at] = await Promise.all([get($, 'current'), get($, 'phase'), get($, 'position')])
   if (now && shown !== 'idle') {
@@ -819,4 +801,5 @@ export async function restore($: EngineInterface, active: Session) {
 
   await setList($, 'queue', () => (saved && !queued.some(track => track.id === saved.id) ? [saved, ...queued] : queued))
   await $.store.delete(CURRENT_KEY)
+  await showStatus($)
 }

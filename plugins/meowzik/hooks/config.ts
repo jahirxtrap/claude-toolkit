@@ -1,11 +1,14 @@
 import type { EngineInterface, PluginOptions } from 'claude-code'
 
+import type { MiniPlayer } from '../types'
 import type { SearchSource } from './sources'
 import { Problem } from './text'
 
 export type Platform = 'windows' | 'mac' | 'linux'
 
 export type Settings = {
+  miniPlayer: MiniPlayer
+  showsStatus: boolean
   searchSource: SearchSource
   cookies: string
   cookiesFromBrowser: string
@@ -42,6 +45,7 @@ const CONFIG_FOLDER = '.claude'
 const WINDOWS = 'Windows_NT'
 const DARWIN = 'Darwin'
 const ARGUMENT = /"([^"]*)"|'([^']*)'|(\S+)/g
+const MINI_PLAYERS: readonly MiniPlayer[] = ['playing', 'always', 'off']
 
 const textOf = (options: PluginOptions, key: string) => {
   const value = options[key]
@@ -52,6 +56,8 @@ const textOf = (options: PluginOptions, key: string) => {
 export const argumentsOf = (raw: string) => [...raw.matchAll(ARGUMENT)].map(match => match[1] ?? match[2] ?? match[3] ?? '')
 
 export const settingsOf = (options: PluginOptions): Settings => ({
+  miniPlayer: MINI_PLAYERS.find(player => player === textOf(options, 'miniPlayer')) ?? 'playing',
+  showsStatus: options.statusLine !== false,
   searchSource: textOf(options, 'searchSource') === 'soundcloud' ? 'soundcloud' : 'youtube',
   cookies: textOf(options, 'cookies'),
   cookiesFromBrowser: textOf(options, 'cookiesFromBrowser'),

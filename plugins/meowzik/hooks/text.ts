@@ -77,12 +77,6 @@ const TEXT = {
   clearQueue: 'Clear queue',
   clearHistory: 'Clear history',
 
-  setupPlayer: 'Player',
-  miniPlayerLabel: 'Mini player above the prompt',
-  miniPlayerPlaying: 'While music plays',
-  miniPlayerAlways: 'Always',
-  miniPlayerOff: 'Off',
-  statusLineLabel: 'Song in the status line',
   miniTitle: '{note} {title}',
   setupTools: 'Tools',
   toolReady: '{tool} {version}',
