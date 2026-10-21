@@ -1,0 +1,53 @@
+{
+  "name": "meowzik",
+  "version": "0.1.0",
+  "description": "A music player beside the chat, after the Meowzik Discord bot: YouTube, SoundCloud, Spotify and Suno, a queue, history and favorites with no limits, loop, shuffle, autoplay, volume and seeking. Claude can play and control it too, and it installs mpv and yt-dlp when they are missing.",
+  "author": {
+    "name": "jahirtrap",
+    "url": "https://github.com/jahirxtrap"
+  },
+  "homepage": "https://github.com/jahirxtrap/claude-toolkit/tree/main/plugins/meowzik",
+  "repository": "https://github.com/jahirxtrap/claude-toolkit",
+  "license": "MIT",
+  "keywords": ["mod", "pane", "music", "command", "tool"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "searchSource": {
+      "type": "string",
+      "title": "Search source",
+      "description": "Where a song name is searched: YouTube, or SoundCloud (no login needed; it skips the 30-second previews).",
+      "options": ["youtube", "soundcloud"],
+      "default": "youtube"
+    },
+    "cookies": {
+      "type": "string",
+      "title": "YouTube cookies file",
+      "description": "A cookies.txt (Netscape) or a browser-extension JSON export, from a throwaway account logged into YouTube. Used only when YouTube asks to confirm you are not a bot; Meowzik works on its own copy and keeps the session it rotates.",
+      "default": ""
+    },
+    "cookiesFromBrowser": {
+      "type": "string",
+      "title": "Cookies from browser",
+      "description": "A browser yt-dlp reads YouTube cookies from instead of a file (firefox, chrome, edge, brave...).",
+      "default": ""
+    },
+    "ytdlpArgs": {
+      "type": "string",
+      "title": "Extra yt-dlp arguments",
+      "description": "Added to every yt-dlp call: a proxy, extractor arguments and the like.",
+      "default": ""
+    },
+    "ytdlp": {
+      "type": "string",
+      "title": "yt-dlp",
+      "description": "The yt-dlp executable, by path. Empty: the standalone build Meowzik installs, which carries the scripts that solve YouTube's challenges (a pip install may not).",
+      "default": ""
+    },
+    "mpv": {
+      "type": "string",
+      "title": "mpv",
+      "description": "The mpv executable, by path. Empty: the one Meowzik installs, else mpv on the PATH.",
+      "default": ""
+    }
+  }
+}
