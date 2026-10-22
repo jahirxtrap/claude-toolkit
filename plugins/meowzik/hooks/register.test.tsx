@@ -64,6 +64,12 @@ const SONGS: Record<string, Song> = {
   'around the world': { id: 'K0HSD_i2DvA', title: 'Around the World', uploader: 'Daft Punk' },
 }
 
+const LYRIC_VIDEOS: Record<string, Song> = {
+  'xynitra hiperactivo': { id: 'n_f8d4oQOXg', title: 'Xynitra - Hiperactivo (Official Lyric Video)', uploader: 'Xynitra' },
+}
+
+const SEARCH = 'ytsearch1:'
+
 const ran = (stdout = '', exitCode = 0): { value: ProcessRunResult } => ({
   value: { exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false },
 })
@@ -139,7 +145,11 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
       return { code: 0, signal: null }
     }
 
-    const song = SONGS[target.replace(/^ytsearch1:/, '').replace(/ audio$/, '')]
+    const words = target.startsWith(SEARCH) ? target.slice(SEARCH.length) : target
+    const song = SONGS[words.replace(/ audio$/, '')] ?? LYRIC_VIDEOS[words]
+    if (!song && target.startsWith(SEARCH)) {
+      return { code: 0, signal: null }
+    }
     if (!song) {
       yield { stream: 'stderr', text: 'ERROR: no results' }
       return { code: 1, signal: null }
@@ -290,6 +300,23 @@ test('a song name plays at once, pauses through the control file, and ends in th
   expect(await texts(ui)).toContain('Nothing is playing right now.')
   expect(await labelOf(ui, 'tab:history')).toBe('History (1)')
   expect(machine.statuses.at(-1)).toBeUndefined()
+
+  await ui.unmount()
+})
+
+test('a search that finds nothing with "audio" tries again without it', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock)
+  const ui = await start($, 'desktop')
+  const searches = () => machine.commands.filter(isYtdlp).flatMap(argv => argv.filter(arg => arg.startsWith(SEARCH)))
+
+  await ui.input({ key: 'add', text: 'xynitra hiperactivo' })
+  expect(searches()).toEqual([`${SEARCH}xynitra hiperactivo audio`, `${SEARCH}xynitra hiperactivo`])
+  expect(machine.statuses.at(-1)).toBe('Playing: Xynitra - Hiperactivo (Official Lyric Video)')
+
+  await ui.input({ key: 'add', text: 'nothing like this' })
+  expect(searches().slice(-2)).toEqual([`${SEARCH}nothing like this audio`, `${SEARCH}nothing like this`])
+  expect(await texts(ui)).toContain('Could not play that: No results found.')
 
   await ui.unmount()
 })

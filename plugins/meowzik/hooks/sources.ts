@@ -104,8 +104,8 @@ export const queryOf = (raw: string): Query => {
 
 export const searchOf = (text: string, source: SearchSource) =>
   source === 'soundcloud'
-    ? { target: `scsearch5:${text}`, args: ['--ignore-errors'] }
-    : { target: `ytsearch1:${text} audio`, args: ['--flat-playlist'] }
+    ? { targets: [`scsearch5:${text}`], args: ['--ignore-errors'] }
+    : { targets: [`ytsearch1:${text} audio`, `ytsearch1:${text}`], args: ['--flat-playlist'] }
 
 const sourceOf = (entry: Entry, link: string): Source => {
   const key = (entry.ie_key ?? entry.extractor_key ?? '').toLowerCase()

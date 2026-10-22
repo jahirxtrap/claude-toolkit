@@ -42,9 +42,12 @@ test('a query is told apart by what it links to', () => {
   expect(queryOf('https://soundcloud.com/artist/track')).toEqual({ kind: 'link', url: 'https://soundcloud.com/artist/track' })
 })
 
-test('a search asks one YouTube result with audio in mind, or five from SoundCloud', () => {
-  expect(searchOf('one more time', 'youtube')).toEqual({ target: 'ytsearch1:one more time audio', args: ['--flat-playlist'] })
-  expect(searchOf('one more time', 'soundcloud')).toEqual({ target: 'scsearch5:one more time', args: ['--ignore-errors'] })
+test('a search asks one YouTube result with audio in mind then without, or five from SoundCloud', () => {
+  expect(searchOf('one more time', 'youtube')).toEqual({
+    targets: ['ytsearch1:one more time audio', 'ytsearch1:one more time'],
+    args: ['--flat-playlist'],
+  })
+  expect(searchOf('one more time', 'soundcloud')).toEqual({ targets: ['scsearch5:one more time'], args: ['--ignore-errors'] })
 })
 
 test('a yt-dlp entry becomes a track, and previews and broken lines are dropped', () => {

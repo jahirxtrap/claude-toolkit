@@ -34,9 +34,15 @@ async function pageOf($: EngineInterface, url: string, problem: 'spotifyUnreadab
 
 export async function searchTracks($: EngineInterface, ytdlp: Ytdlp, text: string, requestedBy: Requester) {
   const search = searchOf(text, ytdlp.settings.searchSource)
-  const found = tracksOf(await ytdlpLines($, ytdlp, [...search.args, '--print', ENTRY_TEMPLATE, search.target]), requestedBy)
 
-  return found.slice(0, 1)
+  for (const target of search.targets) {
+    const found = tracksOf(await ytdlpLines($, ytdlp, [...search.args, '--print', ENTRY_TEMPLATE, target]), requestedBy)
+    if (found.length > 0) {
+      return found.slice(0, 1)
+    }
+  }
+
+  return []
 }
 
 async function tracksFor($: EngineInterface, ytdlp: Ytdlp, query: Query, requestedBy: Requester, onLine: () => void): Promise<Track[]> {

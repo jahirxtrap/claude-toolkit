@@ -22,7 +22,7 @@
     {
       "name": "meowzik",
       "description": "A music player beside the chat, after the Meowzik Discord bot: YouTube, SoundCloud, Spotify and Suno, a queue, history and favorites with no limits, loop, shuffle, autoplay, volume and seeking. Claude can play and control it too, and it installs mpv and yt-dlp when they are missing.",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "source": "./plugins/meowzik",
       "category": "Media",
       "tags": [
