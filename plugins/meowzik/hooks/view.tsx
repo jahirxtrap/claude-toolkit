@@ -38,6 +38,7 @@ import {
   moveInQueue,
   playFrom,
   refreshLyrics,
+  refreshShared,
   removeFrom,
   seekBy,
   seekTo,
@@ -94,6 +95,7 @@ const nextLine = (view: Values) => {
 }
 
 export async function openPane($: EngineInterface) {
+  await refreshShared($)
   const opened = await $.ui.open({ id: PANE, title: say('paneTitle'), rows: PANE_ROWS })
 
   return opened.isPlaced ? say('paneOpened') : say('paneWaiting', { reason: opened.reason })
@@ -114,6 +116,9 @@ async function logoOf($: EngineInterface, path: string) {
 async function openTab($: EngineInterface, tab: Tab) {
   await set($, 'tab', tab)
   await set($, 'page', 0)
+  if (tab === 'history' || tab === 'favorites') {
+    await refreshShared($)
+  }
 }
 
 async function turnPage($: EngineInterface, page: number) {

@@ -12,7 +12,10 @@ const YTDLP = `${DATA}\\bin\\yt-dlp.exe`
 const DENO = `${DATA}\\bin\\deno\\deno.exe`
 const NODE = 'node'
 const VERSIONS: Record<string, string> = { [MPV]: 'mpv v0.41.0 Copyright', [YTDLP]: '2026.08.19', [DENO]: 'deno 2.9.8 (stable)', [NODE]: 'v24.8.0' }
-const CONTROL = `${DATA}\\run\\control.json`
+const TEMP = `${HOME}\\AppData\\Local\\Temp`
+const SESSION = '7c0e5a52-1b2f-4f0a-9d3e-3a6f1b2c4d5e'
+const RUN = `${TEMP}\\meowzik\\${SESSION}`
+const CONTROL = `${RUN}\\control.json`
 const LOGO = 'logo.png'
 const SYSTEM = 'C:\\WINDOWS'
 const TAR = `${SYSTEM}\\System32\\tar.exe`
@@ -85,6 +88,29 @@ const isPlayer = (argv: readonly string[]) => argv[0] === MPV && argv.some(arg =
 const entryOf = (song: Song) =>
   JSON.stringify({ id: song.id, title: song.title, duration: SONG_SECONDS, channel: song.uploader, url: `https://www.youtube.com/watch?v=${song.id}`, ie_key: 'Youtube' })
 
+const storedOf = (name: string) => {
+  const song = SONGS[name] as Song
+
+  return {
+    id: song.id,
+    title: song.title,
+    url: `https://www.youtube.com/watch?v=${song.id}`,
+    duration: SONG_SECONDS,
+    uploader: song.uploader,
+    thumbnail: null,
+    source: 'youtube',
+    requestedBy: 'you',
+  }
+}
+
+const listFiles = (list: string, names: readonly string[]) => ({
+  [`${DATA}\\lists\\${list}\\index.json`]: '{"chunks":1}',
+  [`${DATA}\\lists\\${list}\\0.json`]: JSON.stringify(names.map(storedOf)),
+})
+
+const titlesIn = (files: ReadonlyMap<string, string>, list: string) =>
+  (JSON.parse(files.get(`${DATA}\\lists\\${list}\\0.json`) ?? '[]') as { title: string }[]).map(track => track.title)
+
 const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
   const files = new Map<string, string>(Object.entries(options.files ?? {}))
   const times = new Map<string, number>()
@@ -124,8 +150,8 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
     if (argv.includes('--write-subs') || argv.includes('--write-auto-subs')) {
       const written = argv.includes('--write-subs') ? options.subtitles : options.captions
       for (const [language, json3] of Object.entries(written ?? {})) {
-        files.set(`${DATA}\\run\\subs.${language}.json3`, json3)
-        times.set(`${DATA}\\run\\subs.${language}.json3`, clock.now())
+        files.set(`${RUN}\\subs.${language}.json3`, json3)
+        times.set(`${RUN}\\subs.${language}.json3`, clock.now())
       }
       yield line('en')
       return { code: 0, signal: null }
@@ -159,8 +185,10 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
   }
 
   mock.store(on, options.store)
-  mock.env(on, { OS: 'Windows_NT', USERPROFILE: HOME, PROCESSOR_ARCHITECTURE: 'AMD64', SystemRoot: SYSTEM })
+  mock.env(on, { OS: 'Windows_NT', USERPROFILE: HOME, PROCESSOR_ARCHITECTURE: 'AMD64', SystemRoot: SYSTEM, TEMP })
+  on('session.id', () => ({ value: SESSION }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('tool.register', (_, e) => ({ value: { tool: `mcp__meowzik__${e.name}` } }))
   on('ui.open', (_, e) => (opened.push(e.id), { value: { isPlaced: true } }))
@@ -377,28 +405,17 @@ test('loop track plays the song again, and favorites keep it for later sessions'
   await ui.unmount()
 })
 
-test('a fresh session reads the lists and the settings back', async ($, on) => {
+test('a fresh session takes the queue the last one left, and reads the lists and the settings back', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
-  const queued = [JSON.parse(entryOf(SONGS['daft punk'] as Song))].map(entry => ({
-    id: entry.id,
-    title: entry.title,
-    url: entry.url,
-    duration: 3,
-    uploader: 'Daft Punk',
-    thumbnail: null,
-    source: 'youtube',
-    requestedBy: 'you',
-  }))
-  world(on, clock, {
-    files: {
-      [`${DATA}\\lists\\queue\\index.json`]: '{"chunks":1}',
-      [`${DATA}\\lists\\queue\\0.json`]: JSON.stringify(queued),
-    },
+  const machine = world(on, clock, {
+    files: { ...listFiles('queue', ['daft punk']), ...listFiles('played', ['get lucky']) },
     store: { loop: 'queue', volume: 40 },
   })
   const ui = await start($, 'desktop')
 
   expect(await labelOf(ui, 'tab:queue')).toBe('Queue (1)')
+  expect(await labelOf(ui, 'tab:history')).toBe('History (1)')
+  expect(machine.files.get(`${DATA}\\lists\\queue\\index.json`)).toBe('{"chunks":0}')
   expect(await labelOf(ui, 'loop')).toBe(ICONS.loop)
   expect((await ui.find({ key: 'loop' }))?.props.variant).toBe('primary')
   expect((await ui.find({ key: 'shuffle' }))?.props.variant).toBe('secondary')
@@ -410,6 +427,52 @@ test('a fresh session reads the lists and the settings back', async ($, on) => {
   expect((await ui.find({ type: 'Link' }))?.props.label).toBe('One More Time')
 
   await ui.unmount()
+})
+
+test('sessions share the history and the favorites without losing what another saved, and Back stays in this one', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock)
+  const ui = await start($, 'desktop')
+  const saveElsewhere = (list: string, names: readonly string[]) => {
+    for (const [path, text] of Object.entries(listFiles(list, names))) {
+      machine.files.set(path, text)
+    }
+  }
+
+  await ui.input({ key: 'add', text: 'daft punk' })
+  expect(machine.commands.find(isPlayer)?.some(arg => arg.includes(CONTROL))).toBe(true)
+
+  saveElsewhere('favorites', ['get lucky'])
+  await ui.press({ key: 'favorite' })
+  expect(titlesIn(machine.files, 'favorites')).toEqual(['Get Lucky', 'One More Time'])
+  expect(await labelOf(ui, 'tab:favorites')).toBe('Favorites (2)')
+
+  await clock.advance(SONG_SECONDS * 1000 + TICK_MS)
+  expect(titlesIn(machine.files, 'played')).toEqual(['One More Time'])
+
+  saveElsewhere('played', ['daft punk', 'around the world'])
+  await ui.input({ key: 'add', text: 'get lucky' })
+  await ui.press({ key: 'back' })
+  expect((await ui.find({ type: 'Link' }))?.props.label).toBe('One More Time')
+  expect(titlesIn(machine.files, 'played')).toEqual(['Around the World'])
+
+  await ui.unmount()
+})
+
+test('a session keeps its queue to itself and leaves it for the next one when it closes', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock)
+  const ui = await start($, 'desktop')
+
+  await ui.input({ key: 'add', text: 'daft punk' })
+  await ui.input({ key: 'add', text: 'get lucky' })
+  expect(titlesIn(machine.files, 'queue')).toEqual([])
+
+  await $.session.end({ reason: 'clear', sessionId: SESSION, resume: { id: SESSION } })
+  expect(titlesIn(machine.files, 'queue')).toEqual([])
+
+  await $.session.end({ reason: 'prompt_input_exit', sessionId: SESSION, resume: { id: SESSION } })
+  expect(titlesIn(machine.files, 'queue')).toEqual(['One More Time', 'Get Lucky'])
 })
 
 test('missing tools are installed on the first song, and the setup tab says what is there', async ($, on) => {

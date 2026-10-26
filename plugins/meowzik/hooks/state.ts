@@ -17,6 +17,7 @@ const position = atom({ plugin: 'meowzik', key: 'position' } as const, 0)
 const length = atom({ plugin: 'meowzik', key: 'length' } as const, 0)
 const queue = atom({ plugin: 'meowzik', key: 'queue' } as const, [] as Track[])
 const played = atom({ plugin: 'meowzik', key: 'played' } as const, [] as Track[])
+const trail = atom({ plugin: 'meowzik', key: 'trail' } as const, [] as Track[])
 const favorites = atom({ plugin: 'meowzik', key: 'favorites' } as const, [] as Track[])
 const loop = atom({ plugin: 'meowzik', key: 'loop' } as const, 'off' as LoopMode)
 const isShuffled = atom({ plugin: 'meowzik', key: 'isShuffled' } as const, false)
@@ -61,6 +62,8 @@ export async function get<K extends Key>($: EngineInterface, key: K): Promise<Va
       return (await read($, queue)) as Values[K]
     case 'played':
       return (await read($, played)) as Values[K]
+    case 'trail':
+      return (await read($, trail)) as Values[K]
     case 'favorites':
       return (await read($, favorites)) as Values[K]
     case 'loop':
@@ -104,6 +107,8 @@ export async function put<K extends Key>($: EngineInterface, key: K, change: Cha
       return (await update($, queue, apply)) as Values[K]
     case 'played':
       return (await update($, played, apply)) as Values[K]
+    case 'trail':
+      return (await update($, trail, apply)) as Values[K]
     case 'favorites':
       return (await update($, favorites, apply)) as Values[K]
     case 'loop':
@@ -143,6 +148,7 @@ export async function snapshot($: EngineInterface): Promise<Values> {
     shownLength,
     shownQueue,
     shownPlayed,
+    shownTrail,
     shownFavorites,
     shownLoop,
     shownShuffle,
@@ -162,6 +168,7 @@ export async function snapshot($: EngineInterface): Promise<Values> {
     read($, length),
     read($, queue),
     read($, played),
+    read($, trail),
     read($, favorites),
     read($, loop),
     read($, isShuffled),
@@ -183,6 +190,7 @@ export async function snapshot($: EngineInterface): Promise<Values> {
     length: shownLength,
     queue: shownQueue,
     played: shownPlayed,
+    trail: shownTrail,
     favorites: shownFavorites,
     loop: shownLoop,
     isShuffled: shownShuffle,

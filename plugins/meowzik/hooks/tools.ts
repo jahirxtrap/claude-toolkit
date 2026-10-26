@@ -9,6 +9,7 @@ import {
   enqueueFrom,
   moveInQueue,
   playFrom,
+  refreshShared,
   removeFrom,
   seekTo,
   setLoop,
@@ -21,6 +22,7 @@ import {
   toggleShuffle,
 } from './playback'
 import type { Placement, Reply } from './playback'
+import { isShared } from './shelf'
 import type { ListName } from './shelf'
 import { get, snapshot } from './state'
 import { clockOf, lengthOf, modesOf, noticeTextOf, say, switchOf, titleOf } from './text'
@@ -192,6 +194,9 @@ async function listed($: EngineInterface, input: Input) {
   const action = textOf(input, 'action')
   if (!list) {
     return unknown(textOf(input, 'list'))
+  }
+  if (isShared(list)) {
+    await refreshShared($)
   }
 
   const items = await get($, list)

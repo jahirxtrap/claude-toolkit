@@ -44,6 +44,10 @@ const DATA_FOLDER = 'meowzik'
 const CONFIG_FOLDER = '.claude'
 const WINDOWS = 'Windows_NT'
 const DARWIN = 'Darwin'
+const WINDOWS_TEMP = ['AppData', 'Local', 'Temp']
+const UNIX_TEMP = '/tmp'
+const SESSION_UNSAFE = /[^\w-]/g
+const SESSION_FALLBACK = 'session'
 const ARGUMENT = /"([^"]*)"|'([^']*)'|(\S+)/g
 const MINI_PLAYERS: readonly MiniPlayer[] = ['playing', 'always', 'off']
 
@@ -72,11 +76,22 @@ export const joined = (platform: Platform, ...parts: string[]) => {
   return parts.map((part, index) => (index === 0 ? part.replace(/[\\/]+$/, '') : part.replace(/^[\\/]+|[\\/]+$/g, ''))).join(separator)
 }
 
-export const placesFor = (platform: Platform, arch: string, configFolder: string, root: string, systemFolder: string): Places => {
+export type Folders = {
+  platform: Platform
+  arch: string
+  configFolder: string
+  root: string
+  systemFolder: string
+  tempFolder: string
+  sessionId: string
+}
+
+export const placesFor = ({ platform, arch, configFolder, root, systemFolder, tempFolder, sessionId }: Folders): Places => {
   const at = (...parts: string[]) => joined(platform, ...parts)
   const exe = platform === 'windows' ? '.exe' : ''
   const system = (name: string) => (platform === 'windows' && systemFolder ? at(systemFolder, 'System32', `${name}.exe`) : name)
   const data = at(configFolder, DATA_FOLDER)
+  const run = at(tempFolder, DATA_FOLDER, sessionId.replace(SESSION_UNSAFE, '') || SESSION_FALLBACK)
 
   return {
     platform,
@@ -89,11 +104,11 @@ export const placesFor = (platform: Platform, arch: string, configFolder: string
     deno: at(data, 'bin', 'deno', `deno${exe}`),
     tar: system('tar'),
     curl: system('curl'),
-    run: at(data, 'run'),
-    control: at(data, 'run', 'control.json'),
+    run,
+    control: at(run, 'control.json'),
     cookieJar: at(data, 'cookies.txt'),
-    coverPng: at(data, 'run', 'cover.png'),
-    coverJpeg: at(data, 'run', 'cover.jpg'),
+    coverPng: at(run, 'cover.png'),
+    coverJpeg: at(run, 'cover.jpg'),
     lists: at(data, 'lists'),
     script: at(root, 'player', 'meowzik.lua'),
     logo: at(root, 'assets', 'logo.png'),
@@ -112,6 +127,15 @@ export async function placesOf($: EngineInterface): Promise<Places> {
   const arch = (isWindows ? await $.env.get('PROCESSOR_ARCHITECTURE') : machine?.[1]) ?? ''
   const configFolder = (await $.env.get('CLAUDE_CONFIG_DIR')) || joined(platform, home, CONFIG_FOLDER)
   const systemFolder = (isWindows ? await $.env.get('SystemRoot') : null) ?? ''
+  const tempFolder = (isWindows ? await $.env.get('TEMP') : await $.env.get('TMPDIR')) || (isWindows ? joined(platform, home, ...WINDOWS_TEMP) : UNIX_TEMP)
 
-  return placesFor(platform, arch.toLowerCase(), configFolder, $.plugin.root, systemFolder)
+  return placesFor({
+    platform,
+    arch: arch.toLowerCase(),
+    configFolder,
+    root: $.plugin.root,
+    systemFolder,
+    tempFolder,
+    sessionId: await $.session.id(),
+  })
 }

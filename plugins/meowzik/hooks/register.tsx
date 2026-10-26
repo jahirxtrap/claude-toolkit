@@ -3,13 +3,15 @@ import type { EngineInterface, Register } from 'claude-code'
 import { placesOf, settingsOf } from './config'
 import type { Session } from './config'
 import { SEEK_KEY_SECONDS, VOLUME_KEY_STEP, VOLUME_MAX } from './layout'
-import { addSongs, changeVolume, restore, seekBy, seekTo, setVolume } from './playback'
+import { addSongs, changeVolume, leave, restore, seekBy, seekTo, setVolume } from './playback'
 import { checkTools, factsOf } from './setup'
 import { get, put, tell } from './state'
 import { problemText, say } from './text'
 import { answerTool, TOOL_SPECS } from './tools'
 import { drawBand, drawPane, MINI_SEEKBAR, openPane, PANE, SEEKBAR, VOLUME } from './view'
 import { cookieNoticeOf, cookieStateOf } from './ytdlp'
+
+const STAYING: ReadonlySet<string> = new Set(['clear', 'resume'])
 
 const isFraction = (data: unknown): data is { fraction: number } => typeof (data as { fraction?: unknown } | null)?.fraction === 'number'
 
@@ -53,6 +55,14 @@ export const register: Register = (on, options) => {
       void prepare($, active)
     } catch (error) {
       await tell($, 'failure', { reason: problemText(error) }, true)
+    }
+
+    return next(e)
+  })
+
+  on('session.end', async ($, e, next) => {
+    if (!STAYING.has(e.reason)) {
+      await leave($).catch(() => undefined)
     }
 
     return next(e)

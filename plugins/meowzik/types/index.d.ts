@@ -65,6 +65,7 @@ declare module 'claude-code' {
       length: number
       queue: Track[]
       played: Track[]
+      trail: Track[]
       favorites: Track[]
       loop: LoopMode
       isShuffled: boolean

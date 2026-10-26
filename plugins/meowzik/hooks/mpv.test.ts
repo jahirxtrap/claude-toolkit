@@ -131,15 +131,27 @@ test('settings and places come from the options and the machine', () => {
   expect(settingsOf({ miniPlayer: 'sometimes' }).miniPlayer).toBe('playing')
   expect(joined('windows', 'C:\\Users\\me\\', '.claude', 'meowzik')).toBe('C:\\Users\\me\\.claude\\meowzik')
 
-  const windows = placesFor('windows', 'amd64', 'C:\\Users\\me\\.claude', 'C:\\plugins\\meowzik', 'C:\\WINDOWS')
+  const windows = placesFor({
+    platform: 'windows',
+    arch: 'amd64',
+    configFolder: 'C:\\Users\\me\\.claude',
+    root: 'C:\\plugins\\meowzik',
+    systemFolder: 'C:\\WINDOWS',
+    tempFolder: 'C:\\Users\\me\\AppData\\Local\\Temp',
+    sessionId: '7c0e5a52-1b2f-4f0a-9d3e-3a6f1b2c4d5e',
+  })
   expect(windows).toMatchObject({
     mpv: 'C:\\Users\\me\\.claude\\meowzik\\bin\\mpv\\mpv.exe',
     ytdlp: 'C:\\Users\\me\\.claude\\meowzik\\bin\\yt-dlp.exe',
     deno: 'C:\\Users\\me\\.claude\\meowzik\\bin\\deno\\deno.exe',
     tar: 'C:\\WINDOWS\\System32\\tar.exe',
     curl: 'C:\\WINDOWS\\System32\\curl.exe',
-    control: 'C:\\Users\\me\\.claude\\meowzik\\run\\control.json',
+    control: 'C:\\Users\\me\\AppData\\Local\\Temp\\meowzik\\7c0e5a52-1b2f-4f0a-9d3e-3a6f1b2c4d5e\\control.json',
+    coverPng: 'C:\\Users\\me\\AppData\\Local\\Temp\\meowzik\\7c0e5a52-1b2f-4f0a-9d3e-3a6f1b2c4d5e\\cover.png',
+    lists: 'C:\\Users\\me\\.claude\\meowzik\\lists',
     script: 'C:\\plugins\\meowzik\\player\\meowzik.lua',
   })
-  expect(placesFor('linux', 'x86_64', '/home/me/.claude', '/p', '')).toMatchObject({ ytdlp: '/home/me/.claude/meowzik/bin/yt-dlp', tar: 'tar', curl: 'curl' })
+
+  const linux = placesFor({ platform: 'linux', arch: 'x86_64', configFolder: '/home/me/.claude', root: '/p', systemFolder: '', tempFolder: '/tmp', sessionId: '../x y' })
+  expect(linux).toMatchObject({ ytdlp: '/home/me/.claude/meowzik/bin/yt-dlp', tar: 'tar', curl: 'curl', run: '/tmp/meowzik/xy' })
 })

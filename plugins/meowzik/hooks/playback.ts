@@ -32,7 +32,7 @@ import {
   withSeed,
 } from './queue'
 import { readyTools, runtimeArgsOf } from './setup'
-import { loadList, saveList } from './shelf'
+import { isShared, loadList, saveList } from './shelf'
 import type { ListName } from './shelf'
 import { get, put, set, tell } from './state'
 import { clockOf, countKey, LOOP_NAMES, Problem, problemText, say, switchOf, titleOf } from './text'
@@ -127,10 +127,21 @@ async function told($: EngineInterface, reply: Reply) {
 }
 
 async function setList($: EngineInterface, name: ListName, change: (list: Track[]) => Track[]) {
-  const next = await put($, name, change)
-  await saveList($, sessionOf().places, name, next)
+  if (!isShared(name)) {
+    return put($, name, change)
+  }
+
+  const places = sessionOf().places
+  const stored = await loadList($, places, name)
+  const next = await put($, name, () => change(stored))
+  await saveList($, places, name, next)
 
   return next
+}
+
+async function remember($: EngineInterface, track: Track) {
+  await put($, 'trail', list => withPlayed(list, track))
+  await setList($, 'played', list => withPlayed(list, track))
 }
 
 async function toolsFor($: EngineInterface) {
@@ -177,7 +188,6 @@ async function clearPlayer($: EngineInterface, shown: 'idle' | 'loading') {
 
 async function goIdle($: EngineInterface) {
   await clearPlayer($, 'idle')
-  await $.store.delete(CURRENT_KEY)
 }
 
 async function waitUntil($: EngineInterface, at: number) {
@@ -306,7 +316,7 @@ async function failed($: EngineInterface, track: Track, error: unknown, mine: nu
 
   failures += 1
   await told($, reply)
-  await setList($, 'played', list => withPlayed(list, track))
+  await remember($, track)
   await set($, 'current', null)
 
   if (failures >= MAX_FAILURES) {
@@ -335,7 +345,6 @@ async function play($: EngineInterface, track: Track, mine: number, startAt: num
       seen.add(ready.id)
       await set($, 'current', ready)
       await set($, 'length', ready.duration)
-      await $.store.set(CURRENT_KEY, ready)
     }
 
     detach(refreshCover($, mpv, ready, mine))
@@ -391,7 +400,6 @@ async function start($: EngineInterface, track: Track, startAt = 0, isPaused = f
   await set($, 'position', startAt)
   await set($, 'length', track.duration)
   await put($, 'cover', now => (now?.id === track.id ? now : null))
-  await $.store.set(CURRENT_KEY, track)
   await writeControl($)
   await showStatus($)
   detach(play($, track, mine, startAt))
@@ -402,25 +410,26 @@ async function start($: EngineInterface, track: Track, startAt = 0, isPaused = f
 async function settleCurrent($: EngineInterface) {
   const now = await get($, 'current')
   if (now) {
-    await setList($, 'played', list => withPlayed(list, now))
+    await remember($, now)
   }
 }
 
 async function proceed($: EngineInterface, wasSkipped: boolean): Promise<Pending | null> {
-  const [now, mode, queued, history, isRandom, isAuto] = await Promise.all([
+  const [now, mode, queued, behind, isRandom, isAuto] = await Promise.all([
     get($, 'current'),
     get($, 'loop'),
     get($, 'queue'),
-    get($, 'played'),
+    get($, 'trail'),
     get($, 'isShuffled'),
     get($, 'isAutoplay'),
   ])
-  const lists = now ? finished({ queue: queued, played: history }, now, mode, wasSkipped) : { queue: queued, played: history }
+  const lists = now ? finished({ queue: queued, played: behind }, now, mode, wasSkipped) : { queue: queued, played: behind }
   const picked = takeNext(lists.queue, isRandom, Math.random)
 
   await setList($, 'queue', () => picked.queue)
   if (now) {
-    await setList($, 'played', () => lists.played)
+    await set($, 'trail', lists.played)
+    await setList($, 'played', list => withPlayed(list, now))
   }
   if (picked.track) {
     await start($, picked.track)
@@ -569,13 +578,14 @@ export async function skip($: EngineInterface): Promise<Reply> {
 }
 
 async function stepBack($: EngineInterface): Promise<Reply> {
-  const previous = (await get($, 'played')).at(-1)
+  const previous = (await get($, 'trail')).at(-1)
   if (!previous) {
     return told($, replyOf('noPrevious', {}, true))
   }
 
   const now = await get($, 'current')
-  await setList($, 'played', list => list.slice(0, -1))
+  await put($, 'trail', list => list.slice(0, -1))
+  await setList($, 'played', list => list.filter(item => item.id !== previous.id))
   if (now) {
     await setList($, 'queue', list => [now, ...list])
   }
@@ -626,7 +636,7 @@ export async function toggleAutoplay($: EngineInterface) {
   await $.store.set(AUTOPLAY_KEY, isOn)
 
   const isIdle = (await get($, 'phase')) === 'idle'
-  if (isOn && isIdle && (seeds.length > 0 || (await get($, 'played')).length > 0)) {
+  if (isOn && isIdle && (seeds.length > 0 || (await get($, 'trail')).length > 0)) {
     detach(advance($, false))
   }
 
@@ -729,7 +739,7 @@ async function removeEntry($: EngineInterface, list: ListName, index: number): P
     return told($, replyOf('noSuchSong', { number: index + 1 }, true))
   }
 
-  await setList($, list, items => removedAt(items, index))
+  await setList($, list, items => (isShared(list) ? items.filter(item => item.id !== track.id) : removedAt(items, index)))
 
   return replyOf('removed', { title: titleOf(track) })
 }
@@ -755,6 +765,9 @@ export function moveInQueue($: EngineInterface, index: number, target: number) {
 
 async function emptyList($: EngineInterface, list: 'queue' | 'played') {
   await setList($, list, () => [])
+  if (list === 'played') {
+    await set($, 'trail', [])
+  }
 
   return told($, replyOf(list === 'queue' ? 'queueCleared' : 'historyCleared'))
 }
@@ -769,37 +782,65 @@ async function storedOf<T>($: EngineInterface, key: string, isValid: (value: unk
   return isValid(value) ? value : null
 }
 
+export async function refreshShared($: EngineInterface) {
+  if (!session) {
+    return
+  }
+
+  const [history, liked] = await Promise.all([loadList($, session.places, 'played'), loadList($, session.places, 'favorites')])
+  await set($, 'played', history)
+  await set($, 'favorites', liked)
+}
+
+async function takeLeftQueue($: EngineInterface, active: Session) {
+  const [left, saved] = await Promise.all([loadList($, active.places, 'queue'), storedOf($, CURRENT_KEY, isStoredTrack)])
+  const queued = saved && !left.some(track => track.id === saved.id) ? [saved, ...left] : left
+  if (queued.length === 0) {
+    return
+  }
+
+  await set($, 'queue', queued)
+  await saveList($, active.places, 'queue', [])
+  await $.store.delete(CURRENT_KEY)
+}
+
+export async function leave($: EngineInterface) {
+  if (!session) {
+    return
+  }
+
+  const [now, queued] = await Promise.all([get($, 'current'), get($, 'queue')])
+  const left = now && !queued.some(track => track.id === now.id) ? [now, ...queued] : queued
+  if (left.length > 0) {
+    await saveList($, session.places, 'queue', left)
+  }
+}
+
 export async function restore($: EngineInterface, active: Session) {
   session = active
+  run = await $.clock.now()
 
-  const [queued, history, liked] = await Promise.all([
-    loadList($, active.places, 'queue'),
-    loadList($, active.places, 'played'),
-    loadList($, active.places, 'favorites'),
-  ])
-  const [mode, isRandom, isAuto, level, saved] = await Promise.all([
+  const [mode, isRandom, isAuto, level] = await Promise.all([
     storedOf($, LOOP_KEY, isLoopMode),
     storedOf($, SHUFFLE_KEY, isBoolean),
     storedOf($, AUTOPLAY_KEY, isBoolean),
     storedOf($, VOLUME_KEY, isLevel),
-    storedOf($, CURRENT_KEY, isStoredTrack),
+    refreshShared($),
   ])
 
-  await set($, 'favorites', liked)
-  await set($, 'played', history)
   await put($, 'loop', now => mode ?? now)
   await put($, 'isShuffled', now => isRandom ?? now)
   await put($, 'isAutoplay', now => isAuto ?? now)
   await put($, 'volume', now => level ?? now)
 
-  const [now, shown, at] = await Promise.all([get($, 'current'), get($, 'phase'), get($, 'position')])
+  const [now, shown, at, kept] = await Promise.all([get($, 'current'), get($, 'phase'), get($, 'position'), get($, 'queue')])
   if (now && shown !== 'idle') {
-    await set($, 'queue', queued)
     await start($, now, at, shown === 'paused')
     return
   }
+  if (kept.length === 0) {
+    await takeLeftQueue($, active)
+  }
 
-  await setList($, 'queue', () => (saved && !queued.some(track => track.id === saved.id) ? [saved, ...queued] : queued))
-  await $.store.delete(CURRENT_KEY)
   await showStatus($)
 }
