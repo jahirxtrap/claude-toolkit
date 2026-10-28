@@ -8,7 +8,7 @@ import type { SliderProps } from './slider'
 const HOME = 'C:\\Users\\me'
 const DATA = `${HOME}\\.claude\\meowzik`
 const MPV = `${DATA}\\bin\\mpv\\mpv.exe`
-const YTDLP = `${DATA}\\bin\\yt-dlp.exe`
+const YTDLP = `${DATA}\\bin\\ytdlp\\yt-dlp.exe`
 const DENO = `${DATA}\\bin\\deno\\deno.exe`
 const NODE = 'node'
 const VERSIONS: Record<string, string> = { [MPV]: 'mpv v0.41.0 Copyright', [YTDLP]: '2026.08.19', [DENO]: 'deno 2.9.8 (stable)', [NODE]: 'v24.8.0' }
@@ -250,15 +250,12 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
       return program && tools.has(program) ? ran(VERSIONS[program]) : ran('', 1)
     }
     if (program === CURL) {
-      const target = argv[argv.indexOf('-o') + 1] ?? ''
-      files.set(target, 'binary')
-      if (target === YTDLP) {
-        tools.add(YTDLP)
-      }
+      files.set(argv[argv.indexOf('-o') + 1] ?? '', 'binary')
       return ran()
     }
     if (program === TAR) {
-      tools.add(argv.includes(`${DATA}\\bin\\deno`) ? DENO : MPV)
+      const folder = argv[argv.indexOf('-C') + 1] ?? ''
+      tools.add(folder === `${DATA}\\bin\\deno` ? DENO : folder === `${DATA}\\bin\\ytdlp` ? YTDLP : MPV)
       return ran()
     }
     if (program === MPV && argv.includes('--frames=1')) {
@@ -489,7 +486,9 @@ test('missing tools are installed on the first song, and the setup tab says what
 
   await ui.input({ key: 'add', text: 'daft punk' })
 
-  expect(machine.commands.some(argv => argv[0] === CURL && argv.includes(YTDLP))).toBe(true)
+  expect(machine.commands.some(argv => argv[0] === CURL && argv.at(-1)?.endsWith('/yt-dlp_win.zip'))).toBe(true)
+  expect(machine.commands.some(argv => argv[0] === TAR && argv.includes(`${DATA}\\bin\\ytdlp`))).toBe(true)
+  expect(machine.commands.some(argv => argv[0] === CURL && argv.includes(YTDLP))).toBe(false)
   expect(machine.commands.some(argv => argv[0] === TAR && argv.includes(`${DATA}\\bin\\mpv`))).toBe(true)
   expect(machine.commands.some(argv => argv[0] === CURL && argv.at(-1)?.endsWith('/deno-x86_64-pc-windows-msvc.zip'))).toBe(true)
   expect(machine.commands.some(argv => argv[0] === TAR && argv.includes(`${DATA}\\bin\\deno`))).toBe(true)

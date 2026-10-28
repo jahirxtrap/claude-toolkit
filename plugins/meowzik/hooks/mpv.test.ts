@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
-import { argumentsOf, joined, placesFor, settingsOf } from './config'
+import { argumentsOf, joined, placesFor, settingsOf, ytdlpBuildOf } from './config'
 import { coverArgv, playerArgv, readReports } from './mpv'
-import { denoAssetOf, missingOf, mpvAssetOf, runtimeArgsOf, toolLabelOf, toolListOf, versionOf, ytdlpAssetOf } from './setup'
+import { denoAssetOf, missingOf, mpvAssetOf, runtimeArgsOf, toolLabelOf, toolListOf, versionOf } from './setup'
 
 test('mpv gets the script, an escaped control path, the headers and the stream after --', () => {
   const argv = playerArgv({
@@ -58,11 +58,13 @@ test('the script reports are read across split chunks', () => {
 })
 
 test('the downloads match the machine', () => {
-  expect(ytdlpAssetOf('windows', 'amd64')).toBe('yt-dlp.exe')
-  expect(ytdlpAssetOf('windows', 'arm64')).toBe('yt-dlp_arm64.exe')
-  expect(ytdlpAssetOf('mac', 'arm64')).toBe('yt-dlp_macos')
-  expect(ytdlpAssetOf('linux', 'aarch64')).toBe('yt-dlp_linux_aarch64')
-  expect(ytdlpAssetOf('linux', 'x86_64')).toBe('yt-dlp_linux')
+  expect(ytdlpBuildOf('windows', 'amd64')).toEqual({ archive: 'yt-dlp_win.zip', executable: 'yt-dlp.exe' })
+  expect(ytdlpBuildOf('windows', 'arm64')).toEqual({ archive: 'yt-dlp_win_arm64.zip', executable: 'yt-dlp_arm64.exe' })
+  expect(ytdlpBuildOf('windows', 'x86')).toEqual({ archive: 'yt-dlp_win_x86.zip', executable: 'yt-dlp_x86.exe' })
+  expect(ytdlpBuildOf('mac', 'arm64')).toEqual({ archive: 'yt-dlp_macos.zip', executable: 'yt-dlp_macos' })
+  expect(ytdlpBuildOf('linux', 'aarch64')).toEqual({ archive: 'yt-dlp_linux_aarch64.zip', executable: 'yt-dlp_linux_aarch64' })
+  expect(ytdlpBuildOf('linux', 'armv7l')).toEqual({ archive: 'yt-dlp_linux_armv7l.zip', executable: 'yt-dlp_linux_armv7l' })
+  expect(ytdlpBuildOf('linux', 'x86_64')).toEqual({ archive: 'yt-dlp_linux.zip', executable: 'yt-dlp_linux' })
 
   const assets = [
     'ffmpeg-x86_64-git-9a861e968.7z',
@@ -142,7 +144,7 @@ test('settings and places come from the options and the machine', () => {
   })
   expect(windows).toMatchObject({
     mpv: 'C:\\Users\\me\\.claude\\meowzik\\bin\\mpv\\mpv.exe',
-    ytdlp: 'C:\\Users\\me\\.claude\\meowzik\\bin\\yt-dlp.exe',
+    ytdlp: 'C:\\Users\\me\\.claude\\meowzik\\bin\\ytdlp\\yt-dlp.exe',
     deno: 'C:\\Users\\me\\.claude\\meowzik\\bin\\deno\\deno.exe',
     tar: 'C:\\WINDOWS\\System32\\tar.exe',
     curl: 'C:\\WINDOWS\\System32\\curl.exe',
@@ -153,5 +155,5 @@ test('settings and places come from the options and the machine', () => {
   })
 
   const linux = placesFor({ platform: 'linux', arch: 'x86_64', configFolder: '/home/me/.claude', root: '/p', systemFolder: '', tempFolder: '/tmp', sessionId: '../x y' })
-  expect(linux).toMatchObject({ ytdlp: '/home/me/.claude/meowzik/bin/yt-dlp', tar: 'tar', curl: 'curl', run: '/tmp/meowzik/xy' })
+  expect(linux).toMatchObject({ ytdlp: '/home/me/.claude/meowzik/bin/ytdlp/yt-dlp_linux', tar: 'tar', curl: 'curl', run: '/tmp/meowzik/xy' })
 })

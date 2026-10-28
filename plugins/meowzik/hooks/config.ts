@@ -23,6 +23,7 @@ export type Places = {
   platform: Platform
   arch: string
   data: string
+  ytdlpFolder: string
   ytdlp: string
   mpvFolder: string
   mpv: string
@@ -50,6 +51,22 @@ const SESSION_UNSAFE = /[^\w-]/g
 const SESSION_FALLBACK = 'session'
 const ARGUMENT = /"([^"]*)"|'([^']*)'|(\S+)/g
 const MINI_PLAYERS: readonly MiniPlayer[] = ['playing', 'always', 'off']
+
+export type YtdlpBuild = { archive: string; executable: string }
+
+export const isArm = (arch: string) => arch === 'arm64' || arch === 'aarch64'
+
+export const ytdlpBuildOf = (platform: Platform, arch: string): YtdlpBuild => {
+  if (platform === 'windows') {
+    const variant = arch === 'arm64' ? '_arm64' : arch === 'x86' ? '_x86' : ''
+    return { archive: `yt-dlp_win${variant}.zip`, executable: `yt-dlp${variant}.exe` }
+  }
+
+  const executable =
+    platform === 'mac' ? 'yt-dlp_macos' : isArm(arch) ? 'yt-dlp_linux_aarch64' : arch.startsWith('armv7') ? 'yt-dlp_linux_armv7l' : 'yt-dlp_linux'
+
+  return { archive: `${executable}.zip`, executable }
+}
 
 const textOf = (options: PluginOptions, key: string) => {
   const value = options[key]
@@ -97,7 +114,8 @@ export const placesFor = ({ platform, arch, configFolder, root, systemFolder, te
     platform,
     arch,
     data,
-    ytdlp: at(data, 'bin', `yt-dlp${exe}`),
+    ytdlpFolder: at(data, 'bin', 'ytdlp'),
+    ytdlp: at(data, 'bin', 'ytdlp', ytdlpBuildOf(platform, arch).executable),
     mpvFolder: at(data, 'bin', 'mpv'),
     mpv: at(data, 'bin', 'mpv', `mpv${exe}`),
     denoFolder: at(data, 'bin', 'deno'),

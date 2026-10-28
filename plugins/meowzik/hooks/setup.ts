@@ -2,7 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { Setup, Tool } from '../types'
 import type { Places, Platform, Session, Settings } from './config'
-import { joined } from './config'
+import { isArm, joined, ytdlpBuildOf } from './config'
 import { get, put, tell } from './state'
 import { Problem, say } from './text'
 
@@ -38,19 +38,6 @@ export const MANUAL_MPV: Record<Exclude<Platform, 'windows'>, string> = {
 
 let installing: Promise<Setup> | null = null
 
-const isArm = (arch: string) => arch === 'arm64' || arch === 'aarch64'
-
-export const ytdlpAssetOf = (platform: Platform, arch: string) => {
-  if (platform === 'windows') {
-    return arch === 'arm64' ? 'yt-dlp_arm64.exe' : arch === 'x86' ? 'yt-dlp_x86.exe' : 'yt-dlp.exe'
-  }
-  if (platform === 'mac') {
-    return 'yt-dlp_macos'
-  }
-
-  return isArm(arch) ? 'yt-dlp_linux_aarch64' : arch.startsWith('armv7') ? 'yt-dlp_linux_armv7l' : 'yt-dlp_linux'
-}
-
 export const denoAssetOf = (platform: Platform, arch: string) => {
   const cpu = isArm(arch) ? 'aarch64' : 'x86_64'
   const system = platform === 'windows' ? 'pc-windows-msvc' : platform === 'mac' ? 'apple-darwin' : 'unknown-linux-gnu'
@@ -63,6 +50,17 @@ export const mpvAssetOf = (assets: readonly Asset[], arch: string) => {
   const pattern = new RegExp(`^mpv-${build}-\\d{8}-git-[0-9a-f]+\\.7z$`)
 
   return assets.find(asset => pattern.test(asset.name)) ?? null
+}
+
+const zipOf = (tool: Exclude<ToolName, 'mpv'>, places: Places) => {
+  if (tool === 'ytdlp') {
+    const { archive } = ytdlpBuildOf(places.platform, places.arch)
+    return { asset: { name: archive, url: `${YTDLP_RELEASE}/${archive}` }, folder: places.ytdlpFolder, executable: places.ytdlp }
+  }
+
+  const name = denoAssetOf(places.platform, places.arch)
+
+  return { asset: { name, url: `${DENO_RELEASE}/${name}` }, folder: places.denoFolder, executable: places.deno }
 }
 
 export const versionOf = (stdout: string) => {
@@ -186,19 +184,11 @@ async function installTool($: EngineInterface, tool: ToolName, places: Places) {
     await ran($, tool, [brew, 'install', TOOL_NAMES[tool]])
     return
   }
-  if (tool === 'ytdlp') {
-    await announce($, tool, 'stepDownload')
-    await download($, tool, places, `${YTDLP_RELEASE}/${ytdlpAssetOf(places.platform, places.arch)}`, places.ytdlp)
+  if (tool !== 'mpv') {
+    const zip = zipOf(tool, places)
+    await unpack($, tool, places, zip.asset, zip.folder)
     if (isUnix) {
-      await ran($, tool, ['chmod', '+x', places.ytdlp])
-    }
-    return
-  }
-  if (tool === 'runtime') {
-    const name = denoAssetOf(places.platform, places.arch)
-    await unpack($, tool, places, { name, url: `${DENO_RELEASE}/${name}` }, places.denoFolder)
-    if (isUnix) {
-      await ran($, tool, ['chmod', '+x', places.deno])
+      await ran($, tool, ['chmod', '+x', zip.executable])
     }
     return
   }
