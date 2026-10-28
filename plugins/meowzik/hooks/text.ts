@@ -2,8 +2,10 @@ import type { LoopMode, Notice, Track } from '../types'
 
 const TEXT = {
   paneTitle: 'Meowzik',
-  commandDescription: 'Open the Meowzik music player, or play a song, link or playlist',
-  commandHint: '[song, link or playlist]',
+  commandDescription: 'Open the Meowzik music player, or play and control it',
+  commandHint: '[play <song> | pause | next | back | stop | shuffle | repeat | autoplay | volume | favorite]',
+  commandUnknown:
+    'Not a Meowzik command: {typed}. Try play <song, link or playlist>, pause, next, back, stop, shuffle [on|off], repeat [off|track|queue], autoplay [on|off], volume [0-100] or favorite.',
   paneOpened: 'Meowzik is open.',
   paneWaiting: 'Meowzik opens when there is room for it: {reason}',
 

@@ -1,9 +1,11 @@
 import type { EngineInterface, Register } from 'claude-code'
 
+import { answerSubcommand, subcommandOf } from './commands'
+import type { Subcommand } from './commands'
 import { placesOf, settingsOf } from './config'
 import type { Session } from './config'
 import { SEEK_KEY_SECONDS, VOLUME_KEY_STEP, VOLUME_MAX } from './layout'
-import { addSongs, changeVolume, leave, restore, seekBy, seekTo, setVolume } from './playback'
+import { changeVolume, leave, restore, seekBy, seekTo, setVolume } from './playback'
 import { checkTools, factsOf } from './setup'
 import { get, put, tell } from './state'
 import { problemText, say } from './text'
@@ -24,6 +26,14 @@ const served = async ($: EngineInterface, name: string, e: object) => {
     return { result: await answerTool($, name, inputOf(e)) }
   } catch (error) {
     return { result: problemText(error) }
+  }
+}
+
+const commanded = async ($: EngineInterface, subcommand: Subcommand) => {
+  try {
+    return { text: await answerSubcommand($, subcommand) }
+  } catch (error) {
+    return { text: problemText(error) }
   }
 }
 
@@ -69,12 +79,14 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'meowzik' }, async ($, e) => {
-    const text = await openPane($)
-    if (e.args.trim()) {
-      void addSongs($, e.args, 'you', 'end')
+    const typed = e.args.trim()
+    if (!typed) {
+      return { text: await openPane($) }
     }
 
-    return { text }
+    const subcommand = subcommandOf(typed)
+
+    return subcommand ? commanded($, subcommand) : { text: say('commandUnknown', { typed }) }
   })
 
   on('tool.call', { tool: 'mcp__meowzik__play' }, ($, e) => served($, 'play', e))

@@ -65,6 +65,7 @@ const SONGS: Record<string, Song> = {
   'daft punk': { id: 'A2VpR8HahKc', title: 'One More Time', uploader: 'Daft Punk' },
   'get lucky': { id: '5NV6Rdv1a3I', title: 'Get Lucky', uploader: 'Daft Punk' },
   'around the world': { id: 'K0HSD_i2DvA', title: 'Around the World', uploader: 'Daft Punk' },
+  'back in black': { id: 'pAgnJDJN4VA', title: 'Back in Black', uploader: 'AC/DC' },
 }
 
 const LYRIC_VIDEOS: Record<string, Song> = {
@@ -116,6 +117,7 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
   const times = new Map<string, number>()
   const tools = new Set(options.hasTools === false ? [] : [MPV, YTDLP, NODE])
   const commands: string[][] = []
+  const registered: string[] = []
   const statuses: (string | undefined)[] = []
   const opened: string[] = []
   const fetched: string[] = []
@@ -189,7 +191,7 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
   on('session.id', () => ({ value: SESSION }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
-  on('command.register', (_, e) => ({ value: { command: e.name } }))
+  on('command.register', (_, e) => (registered.push(e.name), { value: { command: e.name } }))
   on('tool.register', (_, e) => ({ value: { tool: `mcp__meowzik__${e.name}` } }))
   on('ui.open', (_, e) => (opened.push(e.id), { value: { isPlaced: true } }))
   on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
@@ -272,7 +274,7 @@ const world = (on: On, clock: MockClock, options: WorldOptions = {}) => {
     return { value: yield* e.argv[0] === MPV ? fakeMpv(e.argv) : fakeYtdlp(e.argv) }
   })
 
-  return { files, commands, statuses, opened, fetched, control: () => JSON.parse(files.get(CONTROL) ?? '{}') as Record<string, unknown> }
+  return { files, commands, registered, statuses, opened, fetched, control: () => JSON.parse(files.get(CONTROL) ?? '{}') as Record<string, unknown> }
 }
 
 const start = async <S extends Surface>($: Engine, surface: S) => {
@@ -697,6 +699,54 @@ test('Claude plays, controls and reads the player through its tools', async ($, 
     'History (1)\n1. One More Time (0:03) https://www.youtube.com/watch?v=A2VpR8HahKc',
   )
   expect(await callTool($, 'list', { list: 'queue', action: 'play', number: 9 })).toBe('There is no song number 9 in that list.')
+})
+
+test('/meowzik opens the player and takes play, pause, next, back, the modes, the volume and stop', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const machine = world(on, clock)
+  const ui = await start($, 'desktop')
+  const meowzik = async (args = '') =>
+    (await $.command.run({ command: 'meowzik', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })).text
+
+  expect(machine.registered).toEqual(['meowzik'])
+  expect(await meowzik()).toBe('Meowzik is open.')
+  expect(machine.opened).toEqual(['meowzik'])
+
+  expect(await meowzik('play daft punk')).toBe('Now playing: One More Time')
+  expect(machine.opened).toEqual(['meowzik', 'meowzik'])
+  expect(await meowzik('play get lucky')).toBe('Added to queue: Get Lucky')
+  expect(await meowzik('pause')).toBe('Paused One More Time.')
+  expect(machine.control()).toMatchObject({ pause: true })
+  expect(await meowzik('play')).toBe('Playing One More Time again.')
+  expect(machine.control()).toMatchObject({ pause: false })
+
+  expect(await meowzik('volume 40%')).toBe('Volume: 40%')
+  expect(machine.control()).toMatchObject({ volume: 40 })
+  expect(await meowzik('repeat track')).toBe('Loop: Track')
+  expect(await meowzik('repeat')).toBe('Loop: Queue')
+  expect(await meowzik('repeat')).toBe('Loop: Off')
+  expect(await meowzik('shuffle on')).toBe('Shuffle: On')
+  expect(await meowzik('shuffle')).toBe('Shuffle: Off')
+  expect(await meowzik('shuffle')).toBe('Shuffle: On')
+  expect(await meowzik('autoplay off')).toBe('Autoplay: Off')
+  expect(await meowzik('autoplay')).toBe('Autoplay: On')
+  expect(await meowzik('autoplay')).toBe('Autoplay: Off')
+  expect(await meowzik('favorite')).toBe('Added to favorites: One More Time')
+
+  expect(await meowzik('next')).toBe('Skipped One More Time.')
+  expect((await ui.find({ type: 'Link' }))?.props.label).toBe('Get Lucky')
+  expect(await meowzik('back')).toBe('Now playing: One More Time')
+  expect(await meowzik('skip')).toBe('Skipped One More Time.')
+
+  expect(await meowzik('stop')).toBe('Stopped, and the queue is clear.')
+  expect(await texts(ui)).toContain('Nothing is playing right now.')
+  expect(await meowzik('pause')).toBe('Nothing is playing.')
+
+  expect(await meowzik('back in black')).toMatch(/^Not a Meowzik command: back in black\. Try play <song, link or playlist>, pause/)
+  expect(await texts(ui)).toContain('Nothing is playing right now.')
+  expect(await meowzik('play back in black')).toBe('Now playing: Back in Black')
+
+  await ui.unmount()
 })
 
 test('a phone gets no field but a bar and buttons to move through the song', async ($, on) => {

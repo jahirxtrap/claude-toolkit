@@ -100,7 +100,7 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
   },
 ]
 
-const spoken = (reply: Reply) => say(reply.key, reply.params)
+export const spoken = (reply: Reply) => say(reply.key, reply.params)
 
 const textOf = (input: Input, key: string) => {
   const value = input[key]
@@ -154,7 +154,7 @@ async function autoplayTo($: EngineInterface, value: string) {
   return wantsToggle(value, isOn) ? spoken(await toggleAutoplay($)) : say('autoplayIs', { state: switchOf(isOn) })
 }
 
-async function controlled($: EngineInterface, input: Input) {
+export async function controlled($: EngineInterface, input: Input) {
   const action = textOf(input, 'action')
   const value = textOf(input, 'value').toLowerCase()
   const shown = await get($, 'phase')
