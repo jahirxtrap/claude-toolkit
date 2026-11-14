@@ -30,7 +30,7 @@ A change to a plugin bumps its version in both `plugin.json` and its marketplace
 
 ## MCP servers
 
-A plugin's `.mcp.json` starts its server. When the server's code lives in another repo, launch it from there with `uvx --from git+https://github.com/<owner>/<repo>#subdirectory=<path> <script>` instead of copying the code in: uvx resolves workspace dependencies from the clone, and a cached start takes under two seconds.
+A plugin's `.mcp.json` starts its server from the plugin itself: the server's code ships inside the plugin folder and runs from `${CLAUDE_PLUGIN_ROOT}`, the copy Claude Code installed, so it stays on the installed version until the plugin is updated. Never fetch the code when it starts (`uvx --from git+…`, an unpinned `npx -y <package>`). Third-party packages are pinned: a Python server runs with `uvx --from ${CLAUDE_PLUGIN_ROOT} --constraints ${CLAUDE_PLUGIN_ROOT}/constraints.txt <script>`.
 
 ## Developing
 
