@@ -9,7 +9,7 @@
     {
       "name": "chess",
       "description": "Chess against Claude in a pane, any time, without taking a chat turn: click a piece and its square, Claude thinks and answers in a few seconds. English and Spanish.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "source": "./plugins/chess",
       "category": "Games",
       "tags": [
@@ -22,7 +22,7 @@
     {
       "name": "meowzik",
       "description": "A music player beside the chat, after the Meowzik Discord bot: YouTube, SoundCloud, Spotify and Suno, a queue, history and favorites with no limits, loop, shuffle, autoplay, volume and seeking. Claude can play and control it too, and it installs mpv and yt-dlp when they are missing.",
-      "version": "0.5.1",
+      "version": "0.5.2",
       "source": "./plugins/meowzik",
       "category": "Media",
       "tags": [
