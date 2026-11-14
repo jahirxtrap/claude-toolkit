@@ -21,7 +21,7 @@ A plugin is organized by what it is, not by kind: one that brings a mod, an MCP 
 
 ## Adding a plugin
 
-1. Build it under `plugins/<name>/`. `plugin.json` carries `"author": { "name": "jahirtrap", "url": "https://github.com/jahirxtrap" }`. For a mod, the `plugin-authoring` skill writes the API types beside it; they and its `tsconfig.json` are generated and gitignored.
+1. Build it under `plugins/<name>/`. `plugin.json` carries `"author": { "name": "jahirtrap", "url": "https://github.com/jahirxtrap" }` and `"icon": "./assets/icon.svg"`, the plugin's icon. For a mod, the `plugin-authoring` skill writes the API types beside it; they and its `tsconfig.json` are generated and gitignored.
 2. Add its entry to `.claude-plugin/marketplace.json`: `name`, `description`, `version` (the same as its `plugin.json`), `source: "./plugins/<name>"`, `category`, `tags` (the kinds it includes first: `mod`, `mcp`, `skill`, `command`, `agent`).
 3. Run `bash scripts/check.sh` (the marketplace validates, the catalog matches `plugins/`, every plugin validates and the ones with tests pass them), then the devkit `find_*` checks over the plugin.
 4. Add it to the README: a row in the Plugins table (with its Includes column) and a section of its own.

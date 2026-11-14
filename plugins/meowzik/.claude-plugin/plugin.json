@@ -1,6 +1,6 @@
 {
   "name": "meowzik",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "A music player beside the chat, after the Meowzik Discord bot: YouTube, SoundCloud, Spotify and Suno, a queue, history and favorites with no limits, loop, shuffle, autoplay, volume and seeking. Claude can play and control it too, and it installs mpv and yt-dlp when they are missing.",
   "author": {
     "name": "jahirtrap",
@@ -9,6 +9,7 @@
   "homepage": "https://github.com/jahirxtrap/claude-toolkit/tree/main/plugins/meowzik",
   "repository": "https://github.com/jahirxtrap/claude-toolkit",
   "license": "MIT",
+  "icon": "./assets/icon.svg",
   "keywords": ["mod", "pane", "music", "command", "tool"],
   "types": "./types/index.d.ts",
   "userConfig": {

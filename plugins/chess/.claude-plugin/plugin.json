@@ -1,6 +1,6 @@
 {
   "name": "chess",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Chess against Claude in a pane, any time, without taking a chat turn: click a piece and its square, Claude thinks and answers in a few seconds. English and Spanish.",
   "author": {
     "name": "jahirtrap",
@@ -9,6 +9,7 @@
   "homepage": "https://github.com/jahirxtrap/claude-toolkit/tree/main/plugins/chess",
   "repository": "https://github.com/jahirxtrap/claude-toolkit",
   "license": "MIT",
+  "icon": "./assets/icon.svg",
   "keywords": ["mod", "pane", "game", "command"],
   "types": "./types/index.d.ts"
 }
