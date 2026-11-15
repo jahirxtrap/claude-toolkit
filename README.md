@@ -13,6 +13,7 @@ Every plugin draws on each surface Claude Code has (the terminal, the desktop ap
 | Plugin | Includes | What it does | Command |
 |---|---|---|---|
 | **chess** | mod | Play chess against Claude in a pane, any time, without taking a chat turn. | `/chess` |
+| **gworkspace** | mcp | Gmail, Drive, Calendar, Sheets, Docs, Tasks and Contacts for Claude, on your machine with your own Google client. | (none) |
 | **meowzik** | mod | A music player beside the chat: YouTube, SoundCloud, Spotify and Suno, played by you or by Claude. | `/meowzik` |
 
 ## chess
@@ -29,6 +30,31 @@ Every plugin draws on each surface Claude Code has (the terminal, the desktop ap
 The rules are complete (castling, en passant, promotion, check, mate, stalemate, the fifty-move rule and bare kings) and checked with perft against the reference counts.
 
 See [`plugins/chess`](plugins/chess) for the code and its tests.
+
+## gworkspace
+
+**gworkspace** brings your Google account to Claude through [Workspace MCP](https://github.com/taylorwilsdon/google_workspace_mcp) (MIT, by Taylor Wilsdon), pinned at 2.4.2. The server runs on your machine and talks to Google through an OAuth client of your own, so your mail and files never pass through anyone else's app.
+
+- **Gmail:** search and read mail and threads, download attachments, send, reply and draft, labels and filters.
+- **Drive:** search, list, upload, create folders, copy, download, share and get links.
+- **Calendar:** read and create events, free and busy time, focus time and out of office.
+- **Sheets:** create spreadsheets, read and write ranges, format, tables, append rows, tabs.
+- **Docs:** create and edit documents, read them as Markdown, comments, export to PDF.
+- **Tasks and Contacts:** task lists and tasks; search, create and edit contacts and their groups.
+- **Files stay where you say:** it attaches to a mail or uploads to Drive only from the folders you list in its settings.
+
+**Your own Google client (once, free):**
+
+1. Create a project in the [Google Cloud console](https://console.cloud.google.com/projectcreate).
+2. Enable the APIs of the services you use under **APIs & Services => Library**: Gmail, Google Drive, Google Calendar, Google Sheets, Google Docs, Google Tasks and People (for Contacts).
+3. In **Google Auth Platform**, fill **Branding** (the app name and a support email), set **Audience** to External and **Publish app** (while it is in testing, the session expires every 7 days).
+4. Under **Clients**, create a client of type **Desktop app** and download its JSON.
+
+**Install and sign in:** installing the plugin asks for that JSON, a folder for the session, your Google account and, optionally, the folders it may take files from (separated by `:`, or `;` on Windows). Then ask Claude something about your account ("read my latest mail"): it answers with a Google link => choose your account => Google warns that the app is not verified (it is yours, asking for full Gmail and Drive access) => **Advanced => Go to** your app => accept. The browser lands on `localhost:8761`, and the session stays in its folder; with the app published it does not expire.
+
+Google exempts personal use from verifying the app: you, or a few people you know, accept that warning. Keep the client to yourself: an unverified app with these permissions is capped at 100 users, and its quota and standing are yours.
+
+See [`plugins/gworkspace`](plugins/gworkspace) for its configuration.
 
 ## meowzik
 
@@ -59,6 +85,7 @@ claude-toolkit/
 │   └── marketplace.json   # the catalog: one entry per plugin
 ├── plugins/
 │   ├── chess/             # chess against Claude in a pane (mod)
+│   ├── gworkspace/        # Google Workspace for Claude (MCP server)
 │   └── meowzik/           # a music player beside the chat (mod)
 ├── scripts/
 │   └── check.sh           # validate the marketplace, then validate and test every plugin

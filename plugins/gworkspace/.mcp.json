@@ -1,0 +1,43 @@
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--quiet",
+        "--no-project",
+        "--python",
+        ">=3.10",
+        "--with-requirements",
+        "${CLAUDE_PLUGIN_ROOT}/constraints.txt",
+        "python",
+        "-I",
+        "-m",
+        "main",
+        "--single-user",
+        "--tools",
+        "gmail",
+        "drive",
+        "calendar",
+        "sheets",
+        "docs",
+        "tasks",
+        "contacts",
+        "--tool-tier",
+        "complete"
+      ],
+      "env": {
+        "GOOGLE_CLIENT_SECRET_PATH": "${user_config.client}",
+        "WORKSPACE_MCP_CREDENTIALS_DIR": "${user_config.sessions}",
+        "USER_GOOGLE_EMAIL": "${user_config.email}",
+        "ALLOWED_FILE_DIRS": "${user_config.attachments}",
+        "PORT": "8761",
+        "WORKSPACE_MCP_PORT": "8761",
+        "OAUTHLIB_INSECURE_TRANSPORT": "1",
+        "WORKSPACE_MCP_BRAND_NAME": "gworkspace",
+        "WORKSPACE_MCP_BRAND_ICON_URL": "https://raw.githubusercontent.com/jahirxtrap/claude-toolkit/main/plugins/gworkspace/assets/icon.svg",
+        "WORKSPACE_MCP_BRAND_WEBSITE_URL": "https://github.com/jahirxtrap/claude-toolkit/tree/main/plugins/gworkspace"
+      }
+    }
+  }
+}

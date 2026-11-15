@@ -20,6 +20,19 @@
       ]
     },
     {
+      "name": "gworkspace",
+      "description": "Google Workspace for Claude: Gmail, Drive, Calendar, Sheets, Docs, Tasks and Contacts, through the Workspace MCP server running on your machine with your own Google Cloud client. Read, search and send mail, keep files in Drive, plan in Calendar and work in Sheets and Docs.",
+      "version": "0.1.0",
+      "source": "./plugins/gworkspace",
+      "category": "Productivity",
+      "tags": [
+        "mcp",
+        "google",
+        "gmail",
+        "drive"
+      ]
+    },
+    {
       "name": "meowzik",
       "description": "A music player beside the chat, after the Meowzik Discord bot: YouTube, SoundCloud, Spotify and Suno, a queue, history and favorites with no limits, loop, shuffle, autoplay, volume and seeking. Claude can play and control it too, and it installs mpv and yt-dlp when they are missing.",
       "version": "0.5.3",

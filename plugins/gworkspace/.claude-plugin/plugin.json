@@ -1,0 +1,40 @@
+{
+  "name": "gworkspace",
+  "version": "0.1.0",
+  "description": "Google Workspace for Claude: Gmail, Drive, Calendar, Sheets, Docs, Tasks and Contacts, through the Workspace MCP server running on your machine with your own Google Cloud client. Read, search and send mail, keep files in Drive, plan in Calendar and work in Sheets and Docs.",
+  "author": {
+    "name": "jahirtrap",
+    "url": "https://github.com/jahirxtrap"
+  },
+  "homepage": "https://github.com/jahirxtrap/claude-toolkit/tree/main/plugins/gworkspace",
+  "repository": "https://github.com/jahirxtrap/claude-toolkit",
+  "license": "MIT",
+  "icon": "./assets/icon.svg",
+  "keywords": ["mcp", "google", "gmail", "drive", "calendar", "sheets", "docs"],
+  "userConfig": {
+    "client": {
+      "type": "file",
+      "title": "Google OAuth client",
+      "description": "The JSON of the Desktop app client you created in your own Google Cloud project, as Google downloads it.",
+      "required": true
+    },
+    "sessions": {
+      "type": "directory",
+      "title": "Sessions folder",
+      "description": "Where the server keeps your Google session after the first sign-in.",
+      "required": true
+    },
+    "email": {
+      "type": "string",
+      "title": "Google account",
+      "description": "The Gmail or Google account the server works on.",
+      "required": true
+    },
+    "attachments": {
+      "type": "string",
+      "title": "Folders for files",
+      "description": "The only folders it may attach to a mail or upload to Drive from, separated by ':' (';' on Windows). Empty: none.",
+      "default": ""
+    }
+  }
+}
